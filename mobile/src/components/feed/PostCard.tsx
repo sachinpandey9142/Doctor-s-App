@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Heart, MessageCircle, MoreHorizontal, Share2, Stethoscope } from "lucide-react-native";
 import Animated, {
@@ -16,7 +16,7 @@ import { GlassCard } from "@/components/common/GlassCard";
 import { TypeBadge } from "@/components/common/TypeBadge";
 import type { Post } from "@/types/models";
 import { formatRelativeTime } from "@/utils/date";
-import { hapticTap } from "@/utils/haptics";
+import { hapticLike, hapticTap } from "@/utils/haptics";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -32,11 +32,8 @@ interface PostCardProps {
 function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAuthorPress }: PostCardProps) {
   const theme = useTheme();
 
-  // ── Like micro-interaction: pop up then settle ───────────────────────────
   const likeScale = useSharedValue(1);
   const likeRotate = useSharedValue(0);
-
-  // ── Action button press feedback ─────────────────────────────────────────
   const commentScale = useSharedValue(1);
   const shareScale = useSharedValue(1);
 
@@ -46,20 +43,21 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
   const likeAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }, { rotate: `${likeRotate.value}deg` }]
   }));
+  const commentAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: commentScale.value }] }));
+  const shareAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: shareScale.value }] }));
 
-  const commentAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: commentScale.value }]
-  }));
-
-  const shareAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: shareScale.value }]
-  }));
+  const pressIn = (sv: Animated.SharedValue<number>) => {
+    sv.value = withSpring(0.88, { damping: 14, stiffness: 300 });
+  };
+  const pressOut = (sv: Animated.SharedValue<number>) => {
+    sv.value = withSpring(1, { damping: 14, stiffness: 300 });
+  };
 
   const handleLike = () => {
-    hapticTap();
+    // Distinct haptic for heart: selectionAsync feels like a soft "click"
+    hapticLike();
 
     if (!liked) {
-      // Bouncy heart burst: grow → wobble → settle
       likeScale.value = withSequence(
         withSpring(1.45, { damping: 8, stiffness: 260 }),
         withSpring(0.9, { damping: 12, stiffness: 300 }),
@@ -71,7 +69,6 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
         withTiming(0, { duration: 80 })
       );
     } else {
-      // Subtle shrink on unlike
       likeScale.value = withSequence(
         withSpring(0.75, { damping: 12 }),
         withSpring(1, { damping: 14 })
@@ -81,12 +78,23 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
     onLike(post._id);
   };
 
-  const pressIn = (sv: Animated.SharedValue<number>) => {
-    sv.value = withSpring(0.88, { damping: 14, stiffness: 300 });
+  const handleComment = () => {
+    hapticTap();
+    onComment(post);
   };
 
-  const pressOut = (sv: Animated.SharedValue<number>) => {
-    sv.value = withSpring(1, { damping: 14, stiffness: 300 });
+  const handleShare = async () => {
+    hapticTap();
+    if (onShare) {
+      onShare(post);
+      return;
+    }
+    // Built-in share sheet as fallback
+    const author = isAnonymous ? "Anonymous Case" : post.userId.name;
+    await Share.share({
+      title: "Doctor's App",
+      message: `${author}:\n\n${post.content}`
+    });
   };
 
   return (
@@ -122,7 +130,7 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
           </View>
         </Pressable>
 
-        <Pressable hitSlop={10} style={styles.moreButton}>
+        <Pressable hitSlop={10} style={styles.moreButton} onPress={() => hapticTap()}>
           <MoreHorizontal size={18} color={theme.colors.textTertiary} />
         </Pressable>
       </View>
@@ -167,7 +175,7 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
 
       {/* ── Actions ─────────────────────────────────────────────────── */}
       <View style={styles.actionsRow}>
-        {/* Like — main micro-interaction */}
+        {/* Like */}
         <AnimatedPressable
           onPress={handleLike}
           onPressIn={() => pressIn(likeScale)}
@@ -180,19 +188,14 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
             fill={liked ? theme.colors.error : "transparent"}
             strokeWidth={liked ? 0 : 2}
           />
-          <Text
-            style={[
-              styles.actionLabel,
-              { color: liked ? theme.colors.error : theme.colors.textSecondary }
-            ]}
-          >
+          <Text style={[styles.actionLabel, { color: liked ? theme.colors.error : theme.colors.textSecondary }]}>
             {post.likes.length > 0 ? post.likes.length : "Like"}
           </Text>
         </AnimatedPressable>
 
         {/* Comment */}
         <AnimatedPressable
-          onPress={() => onComment(post)}
+          onPress={handleComment}
           onPressIn={() => pressIn(commentScale)}
           onPressOut={() => pressOut(commentScale)}
           style={[styles.actionButton, commentAnimStyle]}
@@ -206,7 +209,7 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
 
         {/* Share */}
         <AnimatedPressable
-          onPress={onShare ? () => onShare(post) : undefined}
+          onPress={() => void handleShare()}
           onPressIn={() => pressIn(shareScale)}
           onPressOut={() => pressOut(shareScale)}
           style={[styles.actionButton, shareAnimStyle]}
@@ -223,10 +226,7 @@ function PostCardBase({ post, currentUserId, onLike, onComment, onShare, onAutho
 export const PostCard = memo(PostCardBase);
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 10
-  },
-  // ── Header
+  container: { marginBottom: 10 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -235,104 +235,23 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 10
   },
-  authorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1
-  },
-  authorText: {
-    flex: 1
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap"
-  },
-  authorName: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 15,
-    flexShrink: 1
-  },
-  authorMeta: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 12,
-    marginTop: 2
-  },
-  moreButton: {
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  // ── Body
-  body: {
-    paddingHorizontal: 14,
-    paddingBottom: 12
-  },
-  content: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 15,
-    lineHeight: 24
-  },
-  postImage: {
-    marginTop: 10,
-    width: "100%",
-    height: 210,
-    borderRadius: 14
-  },
-  // ── Case box
-  caseBox: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 10,
-    gap: 6
-  },
-  caseTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 2
-  },
-  caseTitle: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 12
-  },
+  authorRow: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  authorText: { flex: 1 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  authorName: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 15, flexShrink: 1 },
+  authorMeta: { fontFamily: "Manrope_500Medium", fontSize: 12, marginTop: 2 },
+  moreButton: { width: 30, height: 30, alignItems: "center", justifyContent: "center" },
+  body: { paddingHorizontal: 14, paddingBottom: 12 },
+  content: { fontFamily: "Manrope_500Medium", fontSize: 15, lineHeight: 24 },
+  postImage: { marginTop: 10, width: "100%", height: 210, borderRadius: 14 },
+  caseBox: { marginTop: 12, borderWidth: 1, borderRadius: 14, padding: 10, gap: 6 },
+  caseTitleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 },
+  caseTitle: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 12 },
   caseRow: {},
-  caseKey: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 10,
-    letterSpacing: 0.6
-  },
-  caseValue: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 1
-  },
-  // ── Divider
-  divider: {
-    height: 1,
-    marginHorizontal: 14
-  },
-  // ── Actions
-  actionsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 8,
-    paddingVertical: 8
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    minHeight: 34
-  },
-  actionLabel: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 13
-  }
+  caseKey: { fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 0.6 },
+  caseValue: { fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19, marginTop: 1 },
+  divider: { height: 1, marginHorizontal: 14 },
+  actionsRow: { flexDirection: "row", paddingHorizontal: 8, paddingVertical: 8 },
+  actionButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 34 },
+  actionLabel: { fontFamily: "Manrope_700Bold", fontSize: 13 }
 });

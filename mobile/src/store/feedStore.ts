@@ -43,6 +43,17 @@ const mergeUniquePosts = (existing: Post[], incoming: Post[]) => {
   );
 };
 
+/** Apply an optimistic like/unlike mutation to a post array */
+const applyLikeMutation = (posts: Post[], postId: string, authUserId: string, liked: boolean): Post[] =>
+  posts.map((post) => {
+    if (post._id !== postId) return post;
+    const withoutSelf = post.likes.filter((id) => id !== authUserId);
+    return {
+      ...post,
+      likes: liked ? [...withoutSelf, authUserId] : withoutSelf
+    };
+  });
+
 export const useFeedStore = create<FeedState>((set, get) => ({
   posts: [],
   casePosts: [],
@@ -70,9 +81,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
 
   fetchMoreFeed: async () => {
     const { page, hasMore, loading } = get();
-    if (!hasMore || loading) {
-      return;
-    }
+    if (!hasMore || loading) return;
 
     set({ loading: true });
 
@@ -88,7 +97,9 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       }));
     } catch (error) {
       set({ loading: false });
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to load more posts"), "error");
+      useToastStore
+        .getState()
+        .showToast(extractErrorMessage(error, "Failed to load more posts"), "error");
     }
   },
 
@@ -105,7 +116,9 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       });
     } catch (error) {
       set({ refreshing: false });
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to refresh feed"), "error");
+      useToastStore
+        .getState()
+        .showToast(extractErrorMessage(error, "Failed to refresh feed"), "error");
     }
   },
 
@@ -115,12 +128,13 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       set({ casePosts: response.data });
     } catch (error) {
       set({ casePosts: [] });
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to load case discussions"), "error");
+      useToastStore
+        .getState()
+        .showToast(extractErrorMessage(error, "Failed to load case discussions"), "error");
     }
   },
 
   createPost: async (payload) => {
-    // Let the error bubble up to the screen so it can show its own UI feedback
     const created = await createPostRequest(payload);
 
     set((state) => ({
@@ -129,37 +143,54 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }));
   },
 
+  /**
+   * Optimistic like/unlike:
+   * 1. Snapshot the current liked state
+   * 2. Apply the mutation immediately (instant UI)
+   * 3. Fire the API call
+   * 4. If the server disagrees with the optimistic result, reconcile
+   * 5. On network error, roll back to snapshot and show a toast
+   */
   toggleLike: async (postId) => {
     const authUserId = useAuthStore.getState().user?._id;
-    if (!authUserId) {
-      return;
-    }
+    if (!authUserId) return;
+
+    const { posts, casePosts } = get();
+
+    // Snapshot: remember the current liked state for this post
+    const targetPost = posts.find((p) => p._id === postId) ?? casePosts.find((p) => p._id === postId);
+    if (!targetPost) return;
+
+    const wasLiked = targetPost.likes.includes(authUserId);
+    const optimisticLiked = !wasLiked;
+
+    // ── Instant optimistic update ──────────────────────────────────────────
+    set((state) => ({
+      posts: applyLikeMutation(state.posts, postId, authUserId, optimisticLiked),
+      casePosts: applyLikeMutation(state.casePosts, postId, authUserId, optimisticLiked)
+    }));
 
     try {
-      const { liked } = await likePostRequest(postId);
+      const { liked: serverLiked } = await likePostRequest(postId);
 
-      const mutatePost = (post: Post) => {
-        if (post._id !== postId) {
-          return post;
-        }
-
-        const currentLikes = post.likes.filter((id) => id !== authUserId);
-        const likes = liked ? Array.from(new Set([...currentLikes, authUserId])) : currentLikes;
-
-        return { ...post, likes };
-      };
-
-      set((state) => ({
-        posts: state.posts.map(mutatePost),
-        casePosts: state.casePosts.map(mutatePost)
-      }));
+      // Reconcile if server result differs from optimistic assumption
+      if (serverLiked !== optimisticLiked) {
+        set((state) => ({
+          posts: applyLikeMutation(state.posts, postId, authUserId, serverLiked),
+          casePosts: applyLikeMutation(state.casePosts, postId, authUserId, serverLiked)
+        }));
+      }
     } catch (error) {
+      // ── Roll back to snapshot state ──────────────────────────────────────
+      set((state) => ({
+        posts: applyLikeMutation(state.posts, postId, authUserId, wasLiked),
+        casePosts: applyLikeMutation(state.casePosts, postId, authUserId, wasLiked)
+      }));
       useToastStore.getState().showToast(extractErrorMessage(error, "Failed to update like"), "error");
     }
   },
 
   addComment: async (postId, text) => {
-    // Let errors bubble up so CommentsScreen can show UI feedback
     const comment = await commentPostRequest(postId, text);
 
     const mutatePost = (post: Post) =>

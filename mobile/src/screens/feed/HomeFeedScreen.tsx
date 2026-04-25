@@ -1,10 +1,19 @@
-import React, { useCallback, useEffect, useMemo } from "react";
-import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  Animated as RNAnimated,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Bell, Plus, Search, Stethoscope } from "lucide-react-native";
+import { Activity, Bell, Plus, Search } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
@@ -14,7 +23,35 @@ import { PostCard } from "@/components/feed/PostCard";
 import type { RootStackParamList } from "@/navigation/types";
 import { useAuthStore } from "@/store/authStore";
 import { useFeedStore } from "@/store/feedStore";
+import { hapticTap } from "@/utils/haptics";
 import type { Post } from "@/types/models";
+
+// ── Skeleton card that exactly mirrors PostCard's structure ───────────────────
+function SkeletonCard({ colors }: { colors: { surface: string; cardBorder: string; borderLight: string } }) {
+  return (
+    <View style={[styles.skeletonCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+      <View style={styles.skeletonHeader}>
+        <LoadingSkeleton width={42} height={42} borderRadius={21} />
+        <View style={styles.skeletonMeta}>
+          <LoadingSkeleton width={130} height={13} />
+          <View style={{ height: 6 }} />
+          <LoadingSkeleton width={88} height={11} />
+        </View>
+      </View>
+      <View style={{ height: 14 }} />
+      <LoadingSkeleton width="100%" height={12} />
+      <View style={{ height: 8 }} />
+      <LoadingSkeleton width="88%" height={12} />
+      <View style={{ height: 8 }} />
+      <LoadingSkeleton width="70%" height={12} />
+      <View style={[styles.skeletonActions, { borderTopColor: colors.borderLight }]}>
+        <LoadingSkeleton width={52} height={11} />
+        <LoadingSkeleton width={60} height={11} />
+        <LoadingSkeleton width={44} height={11} />
+      </View>
+    </View>
+  );
+}
 
 export function HomeFeedScreen() {
   const theme = useTheme();
@@ -24,6 +61,22 @@ export function HomeFeedScreen() {
   const user = useAuthStore((state) => state.user);
   const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike } =
     useFeedStore((state) => state);
+
+  // ── Skeleton fade-out: when loading finishes the skeleton fades smoothly ──
+  const skeletonOpacity = useRef(new RNAnimated.Value(1)).current;
+  const prevLoadingRef = useRef(loading);
+
+  useEffect(() => {
+    // Trigger fade-out when loading goes from true → false
+    if (prevLoadingRef.current && !loading) {
+      RNAnimated.timing(skeletonOpacity, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true
+      }).start();
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, skeletonOpacity]);
 
   useEffect(() => {
     fetchInitialFeed();
@@ -50,7 +103,7 @@ export function HomeFeedScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: Post; index: number }) => (
-      <Animated.View entering={FadeInDown.delay(index * 40).duration(300).springify()}>
+      <Animated.View entering={FadeInDown.delay(Math.min(index * 35, 210)).duration(280).springify()}>
         <PostCard
           post={item}
           currentUserId={user?._id}
@@ -63,51 +116,30 @@ export function HomeFeedScreen() {
     [openComments, openProfile, toggleLike, user?._id]
   );
 
-  // ── Skeleton loading cards ────────────────────────────────────────────────
-  const skeletonCards = useMemo(
-    () =>
-      Array.from({ length: 4 }).map((_, index) => (
-        <View
-          key={`skel-${index}`}
-          style={[styles.skeletonCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.cardBorder }]}
-        >
-          {/* Author row */}
-          <View style={styles.skeletonHeader}>
-            <LoadingSkeleton width={42} height={42} borderRadius={21} />
-            <View style={styles.skeletonMeta}>
-              <LoadingSkeleton width={120} height={13} />
-              <View style={{ height: 6 }} />
-              <LoadingSkeleton width={90} height={11} />
-            </View>
-          </View>
-          {/* Content lines */}
-          <View style={{ height: 12 }} />
-          <LoadingSkeleton width="100%" height={12} />
-          <View style={{ height: 7 }} />
-          <LoadingSkeleton width="88%" height={12} />
-          <View style={{ height: 7 }} />
-          <LoadingSkeleton width="72%" height={12} />
-          {/* Action bar */}
-          <View style={[styles.skeletonActions, { borderTopColor: theme.colors.borderLight }]}>
-            <LoadingSkeleton width={52} height={12} />
-            <LoadingSkeleton width={52} height={12} />
-            <LoadingSkeleton width={52} height={12} />
-          </View>
-        </View>
-      )),
+  const skeletonColors = useMemo(
+    () => ({
+      surface: theme.colors.surface,
+      cardBorder: theme.colors.cardBorder,
+      borderLight: theme.colors.borderLight
+    }),
     [theme.colors]
   );
 
-  // ── Branded list header ───────────────────────────────────────────────────
+  // ── Refined branded header ────────────────────────────────────────────────
   const listHeader = useMemo(
     () => (
-      <LinearGradient
-        colors={["#EFF6FF", theme.colors.background]}
-        style={styles.feedHeader}
-      >
+      <LinearGradient colors={["#EFF6FF", theme.colors.background]} style={styles.feedHeader}>
+        {/* Brand wordmark row */}
+        <View style={styles.brandRow}>
+          <View style={[styles.brandIcon, { backgroundColor: theme.colors.primaryLight }]}>
+            <Activity size={15} color={theme.colors.primary} strokeWidth={2.5} />
+          </View>
+          <Text style={[styles.brandWordmark, { color: theme.colors.primary }]}>DOCTOR'S APP</Text>
+        </View>
+
         <Text style={[styles.feedTitle, { color: theme.colors.textPrimary }]}>Clinical Feed</Text>
-        <Text style={[styles.feedSub, { color: theme.colors.textSecondary }]}>
-          Verified voices · Latest case discussions
+        <Text style={[styles.feedTagline, { color: theme.colors.textSecondary }]}>
+          Verified medical voices · Case discussions · Latest updates
         </Text>
       </LinearGradient>
     ),
@@ -117,28 +149,39 @@ export function HomeFeedScreen() {
   const clusterTop = insets.top + 8;
   const listTopPad = insets.top + 56;
 
+  const showSkeleton = loading && posts.length === 0;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* ── Fixed action cluster ────────────────────────────────────── */}
+      {/* ── Fixed action cluster ─────────────────────────────────────── */}
       <View style={[styles.actionsCluster, { top: clusterTop }]}>
         <Pressable
           style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
-          onPress={() => navigation.navigate("Discover")}
+          onPress={() => { hapticTap(); navigation.navigate("Discover"); }}
         >
           <Search size={17} color={theme.colors.primary} />
         </Pressable>
 
         <Pressable
           style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
-          onPress={() => navigation.navigate("Notifications")}
+          onPress={() => { hapticTap(); navigation.navigate("Notifications"); }}
         >
           <Bell size={17} color={theme.colors.primary} />
         </Pressable>
       </View>
 
-      {/* ── Content ─────────────────────────────────────────────────── */}
-      {loading && posts.length === 0 ? (
-        <View style={[styles.skeletonWrap, { paddingTop: listTopPad + 72 }]}>{skeletonCards}</View>
+      {/* ── Skeleton (fades out when content loads) ─────────────────── */}
+      {showSkeleton ? (
+        <RNAnimated.View
+          style={[
+            styles.skeletonWrap,
+            { paddingTop: listTopPad + 72, opacity: skeletonOpacity }
+          ]}
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonCard key={i} colors={skeletonColors} />
+          ))}
+        </RNAnimated.View>
       ) : (
         <FlatList
           data={posts}
@@ -158,7 +201,7 @@ export function HomeFeedScreen() {
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
             <EmptyState
-              icon={<Stethoscope size={30} color={theme.colors.primary} />}
+              icon={<Activity size={30} color={theme.colors.primary} />}
               title="Your feed is empty"
               body="Follow medical professionals or publish the first post to get started."
               ctaLabel="Explore Professionals"
@@ -167,16 +210,22 @@ export function HomeFeedScreen() {
             />
           }
           showsVerticalScrollIndicator={false}
+          // ── Buttery smooth scroll ──────────────────────────────────
+          decelerationRate="normal"
+          overScrollMode="never"   // Android: removes over-scroll glow
+          bounces                  // iOS: keep natural bounce
           initialNumToRender={5}
-          maxToRenderPerBatch={5}
+          maxToRenderPerBatch={4}
           windowSize={7}
           removeClippedSubviews={Platform.OS === "android"}
+          // Avoid re-render of off-screen items on scroll position changes
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
       )}
 
       {/* ── FAB ─────────────────────────────────────────────────────── */}
       <Pressable
-        onPress={() => navigation.navigate("CreatePost")}
+        onPress={() => { hapticTap(); navigation.navigate("CreatePost"); }}
         style={[styles.fabWrap, { bottom: insets.bottom + 20 }]}
       >
         <LinearGradient
@@ -208,35 +257,51 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    // Slight shadow on action buttons
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2
   },
-  // ── Feed header
+  // ── Branded header
   feedHeader: {
     paddingBottom: 16,
     paddingTop: 4
   },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10
+  },
+  brandIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  brandWordmark: {
+    fontFamily: "SpaceGrotesk_700Bold",
+    fontSize: 11,
+    letterSpacing: 1.8
+  },
   feedTitle: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 26
+    fontSize: 28
   },
-  feedSub: {
-    marginTop: 4,
+  feedTagline: {
+    marginTop: 5,
     fontFamily: "Manrope_500Medium",
-    fontSize: 13
+    fontSize: 13,
+    lineHeight: 20
   },
   // ── List
   listContent: {
     paddingHorizontal: 14,
     paddingBottom: 110
   },
-  emptyState: {
-    marginTop: 16
-  },
+  emptyState: { marginTop: 16 },
   // ── Skeleton
   skeletonWrap: {
     paddingHorizontal: 14,
@@ -257,9 +322,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10
   },
-  skeletonMeta: {
-    flex: 1
-  },
+  skeletonMeta: { flex: 1 },
   skeletonActions: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -268,10 +331,7 @@ const styles = StyleSheet.create({
     paddingTop: 10
   },
   // ── FAB
-  fabWrap: {
-    position: "absolute",
-    right: 16
-  },
+  fabWrap: { position: "absolute", right: 16 },
   fab: {
     width: 56,
     height: 56,

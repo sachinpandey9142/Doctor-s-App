@@ -10,6 +10,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 
+import { hapticMedium, hapticTap } from "@/utils/haptics";
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -55,7 +57,7 @@ export function AnimatedButton({
   if (variant === "primary") {
     return (
       <AnimatedPressable
-        onPress={onPress}
+        onPress={() => { hapticMedium(); onPress(); }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -84,7 +86,7 @@ export function AnimatedButton({
   if (variant === "secondary") {
     return (
       <AnimatedPressable
-        onPress={onPress}
+        onPress={() => { hapticTap(); onPress(); }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -114,7 +116,7 @@ export function AnimatedButton({
   if (variant === "danger") {
     return (
       <AnimatedPressable
-        onPress={onPress}
+        onPress={() => { hapticTap(); onPress(); }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -143,7 +145,7 @@ export function AnimatedButton({
   // ── Ghost: transparent with border ─────────────────────────────────────────
   return (
     <AnimatedPressable
-      onPress={onPress}
+      onPress={() => { hapticTap(); onPress(); }}
       disabled={isDisabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
