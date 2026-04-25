@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Doctor\'s App</string>
+
+    <!-- Authentication -->
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="name">Full Name</string>
+    <string name="college">College/Hospital</string>
+    <string name="year">Year of Study</string>
+    <string name="role">Role</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="login">Login</string>
+    <string name="dont_have_account">Don\'t have an account? Sign Up</string>
+    <string name="already_have_account">Already have an account? Login</string>
+
+    <!-- Roles -->
+    <string name="mbbs_student">MBBS Student</string>
+    <string name="doctor">Doctor</string>
+    <string name="medical_staff">Medical Staff</string>
+    <string name="nurse">Nurse</string>
+
+    <!-- Navigation -->
+    <string name="home">Home</string>
+    <string name="search">Search</string>
+    <string name="post">Post</string>
+    <string name="chat">Chat</string>
+    <string name="profile">Profile</string>
+
+    <!-- Profile -->
+    <string name="followers">Followers</string>
+    <string name="following">Following</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="bio">Bio</string>
+    <string name="qualification">Qualification</string>
+    <string name="verified">Verified Medical Professional</string>
+
+    <!-- Posts -->
+    <string name="like">Like</string>
+    <string name="comment">Comment</string>
+    <string name="share">Share</string>
+    <string name="caption">Write caption here...</string>
+    <string name="post_button">Post</string>
+    <string name="add_photo">Add Photo</string>
+
+    <!-- Chat -->
+    <string name="message">Message</string>
+    <string name="online">Online</string>
+    <string name="last_seen">Last seen</string>
+
+    <!-- Notifications -->
+    <string name="liked_your_post">liked your post</string>
+    <string name="commented_on_your_post">commented on your post</string>
+    <string name="started_following_you">started following you</string>
+
+</resources>

@@ -1,0 +1,60 @@
+{
+  "users": [
+    {
+      "id": "f61bc847-7515-470c-9fff-15c4df9faebb",
+      "name": "",
+      "email": "test_20260422230936@example.com",
+      "role": "",
+      "college": "",
+      "year": "",
+      "bio": "",
+      "qualification": "",
+      "profileImageUrl": "",
+      "followers": [],
+      "following": [],
+      "isVerified": false,
+      "lastSeen": 1776879576924,
+      "createdAt": 1776879576924,
+      "passwordHash": "$2a$10$p4z.53cnUU0xOM1w1GW3NOFRCBefAX6v1cbL/AH24RlIzj56WsWYe"
+    },
+    {
+      "id": "a1b3a6ed-14be-4446-8222-b1df98d4af44",
+      "name": "Test User",
+      "email": "test_1c5661fb@example.com",
+      "role": "student",
+      "college": "Medical College",
+      "year": "4th Year",
+      "bio": "Test bio",
+      "qualification": "MBBS Student",
+      "profileImageUrl": "http://example.com/image.jpg",
+      "followers": [],
+      "following": [],
+      "isVerified": false,
+      "lastSeen": 1776879629836,
+      "createdAt": 1776879629836,
+      "passwordHash": "$2a$10$D/n5yIlPaNVKQAAQ6X0ti.KXxeNIYeuIZHxZvby/IsVuhzPiWK3Lq"
+    },
+    {
+      "id": "95178d23-ff2e-4d93-9abc-c4eb67025a2f",
+      "name": "Sachin pandey",
+      "email": "sp2828373@gmail.com",
+      "role": "MBBS Student",
+      "college": "apollo",
+      "year": "2nd",
+      "bio": "",
+      "qualification": "",
+      "profileImageUrl": "",
+      "followers": [],
+      "following": [],
+      "isVerified": false,
+      "lastSeen": 0,
+      "createdAt": 0,
+      "passwordHash": "$2a$10$gVx1vQYEN5ixIyCrUB8Z6utbOhQQaBKLUu//woBTKg9Qs0p9bQpHy"
+    }
+  ],
+  "posts": [],
+  "comments": [],
+  "messages": [],
+  "chatRooms": [],
+  "notifications": []
+}

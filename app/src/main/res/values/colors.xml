@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="md_theme_light_primary">#0052CC</color>
+    <color name="md_theme_light_on_primary">#FFFFFF</color>
+    <color name="md_theme_light_primary_container">#DBEAFE</color>
+    <color name="md_theme_light_on_primary_container">#001145</color>
+
+    <!-- Secondary Colors - Medical Green -->
+    <color name="md_theme_light_secondary">#16A34A</color>
+    <color name="md_theme_light_on_secondary">#FFFFFF</color>
+    <color name="md_theme_light_secondary_container">#BBFBDC</color>
+    <color name="md_theme_light_on_secondary_container">#00210D</color>
+
+    <!-- Tertiary Colors -->
+    <color name="md_theme_light_tertiary">#7D5260</color>
+    <color name="md_theme_light_on_tertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiary_container">#FFD8E4</color>
+    <color name="md_theme_light_on_tertiary_container">#31101D</color>
+
+    <!-- Background & Surface -->
+    <color name="md_theme_light_background">#FFFBFE</color>
+    <color name="md_theme_light_on_background">#1F1F1F</color>
+    <color name="md_theme_light_surface">#FFFBFE</color>
+    <color name="md_theme_light_on_surface">#1F1F1F</color>
+
+    <!-- Error -->
+    <color name="md_theme_light_error">#B3261E</color>
+    <color name="md_theme_light_on_error">#FFFFFF</color>
+    <color name="md_theme_light_error_container">#F9DEDC</color>
+    <color name="md_theme_light_on_error_container">#410E0B</color>
+
+    <!-- Custom Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="light_gray">#F5F5F5</color>
+    <color name="dark_gray">#424242</color>
+    <color name="medical_blue">#0052CC</color>
+    <color name="medical_green">#16A34A</color>
+    <color name="soft_green">#DCFCE7</color>
+</resources>

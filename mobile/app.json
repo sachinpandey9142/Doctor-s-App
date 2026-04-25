@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Doctor,s App",
+    "slug": "doctors-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.doctorsapp.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.doctorsapp.mobile"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

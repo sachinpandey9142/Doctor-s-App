@@ -1,0 +1,83 @@
+# ── Node.js ───────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Gradle tools / binary downloads ──────────────────────────────────────────
+.tools/
+.gradle/
+build/
+app/build/
+
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+# Keep the example file (no secrets)
+!.env.example
+
+# ── Backend uploads (user-generated content — not for git) ────────────────────
+backend/uploads/
+
+# ── React Native / Expo ───────────────────────────────────────────────────────
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+
+# ── Android build ─────────────────────────────────────────────────────────────
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+local.properties
+.gradle/
+build/
+app/build/
+android/.gradle/
+android/build/
+android/app/build/
+
+# ── iOS build ─────────────────────────────────────────────────────────────────
+ios/Pods/
+ios/build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+ios/.xcode.env.local
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Java heap dumps ───────────────────────────────────────────────────────────
+*.hprof
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── TypeScript build output ───────────────────────────────────────────────────
+dist/
+out/
+*.tsbuildinfo
+
+# ── Gradle wrapper (keep the wrapper jar & scripts) ──────────────────────────
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat
