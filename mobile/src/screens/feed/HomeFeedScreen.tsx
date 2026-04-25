@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo } from "react";
-import { FlatList, Platform, Pressable, RefreshControl, Share, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Bell, Plus, Search, Sparkles } from "lucide-react-native";
+import { Bell, Plus, Search, Stethoscope } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
-import { GlassCard } from "@/components/common/GlassCard";
+import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import { PostCard } from "@/components/feed/PostCard";
 import type { RootStackParamList } from "@/navigation/types";
@@ -21,9 +22,8 @@ export function HomeFeedScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const user = useAuthStore((state) => state.user);
-  const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike } = useFeedStore(
-    (state) => state
-  );
+  const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike } =
+    useFeedStore((state) => state);
 
   useEffect(() => {
     fetchInitialFeed();
@@ -41,93 +41,104 @@ export function HomeFeedScreen() {
 
   const openProfile = useCallback(
     (post: Post) => {
-      if (!post.userId?._id || post.userId._id === user?._id) {
-        navigation.navigate("UserProfile", { userId: user?._id || post.userId._id });
-        return;
-      }
-
-      navigation.navigate("UserProfile", { userId: post.userId._id });
+      const targetId =
+        !post.userId?._id || post.userId._id === user?._id ? user?._id : post.userId._id;
+      navigation.navigate("UserProfile", { userId: targetId || post.userId._id });
     },
     [navigation, user?._id]
   );
 
-  const sharePost = useCallback(async (post: Post) => {
-    const author = post.isAnonymous && post.type === "case" ? "Anonymous Case" : post.userId.name;
-    await Share.share({
-      title: "Doctor,s App Post",
-      message: `${author} shared:\n\n${post.content}`
-    });
-  }, []);
-
   const renderItem = useCallback(
-    ({ item }: { item: Post }) => (
-      <PostCard
-        post={item}
-        currentUserId={user?._id}
-        onLike={toggleLike}
-        onComment={openComments}
-        onShare={sharePost}
-        onAuthorPress={openProfile}
-      />
+    ({ item, index }: { item: Post; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(index * 40).duration(300).springify()}>
+        <PostCard
+          post={item}
+          currentUserId={user?._id}
+          onLike={toggleLike}
+          onComment={openComments}
+          onAuthorPress={openProfile}
+        />
+      </Animated.View>
     ),
-    [openComments, openProfile, sharePost, toggleLike, user?._id]
+    [openComments, openProfile, toggleLike, user?._id]
   );
 
+  // ── Skeleton loading cards ────────────────────────────────────────────────
+  const skeletonCards = useMemo(
+    () =>
+      Array.from({ length: 4 }).map((_, index) => (
+        <View
+          key={`skel-${index}`}
+          style={[styles.skeletonCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.cardBorder }]}
+        >
+          {/* Author row */}
+          <View style={styles.skeletonHeader}>
+            <LoadingSkeleton width={42} height={42} borderRadius={21} />
+            <View style={styles.skeletonMeta}>
+              <LoadingSkeleton width={120} height={13} />
+              <View style={{ height: 6 }} />
+              <LoadingSkeleton width={90} height={11} />
+            </View>
+          </View>
+          {/* Content lines */}
+          <View style={{ height: 12 }} />
+          <LoadingSkeleton width="100%" height={12} />
+          <View style={{ height: 7 }} />
+          <LoadingSkeleton width="88%" height={12} />
+          <View style={{ height: 7 }} />
+          <LoadingSkeleton width="72%" height={12} />
+          {/* Action bar */}
+          <View style={[styles.skeletonActions, { borderTopColor: theme.colors.borderLight }]}>
+            <LoadingSkeleton width={52} height={12} />
+            <LoadingSkeleton width={52} height={12} />
+            <LoadingSkeleton width={52} height={12} />
+          </View>
+        </View>
+      )),
+    [theme.colors]
+  );
+
+  // ── Branded list header ───────────────────────────────────────────────────
   const listHeader = useMemo(
     () => (
-      <View style={styles.headerWrap}>
-        <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Clinical Community Feed</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-          Verified voices from across hospitals, labs, and universities
+      <LinearGradient
+        colors={["#EFF6FF", theme.colors.background]}
+        style={styles.feedHeader}
+      >
+        <Text style={[styles.feedTitle, { color: theme.colors.textPrimary }]}>Clinical Feed</Text>
+        <Text style={[styles.feedSub, { color: theme.colors.textSecondary }]}>
+          Verified voices · Latest case discussions
         </Text>
-      </View>
+      </LinearGradient>
     ),
-    [theme.colors.textPrimary, theme.colors.textSecondary]
+    [theme.colors]
   );
 
-  const loadingState = loading && posts.length === 0;
-
-  // Action cluster top position: status bar inset + 8px breathing room
   const clusterTop = insets.top + 8;
-  // List top padding: enough to clear the action cluster (inset + cluster height ~42px + gap)
-  const listTopPad = insets.top + 60;
+  const listTopPad = insets.top + 56;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <LinearGradient colors={["#EFF6FF", "transparent"]} style={styles.topAura} />
-
-      {/* Action cluster — fixed overlay, below the status bar */}
+      {/* ── Fixed action cluster ────────────────────────────────────── */}
       <View style={[styles.actionsCluster, { top: clusterTop }]}>
         <Pressable
-          style={[styles.headerButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+          style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
           onPress={() => navigation.navigate("Discover")}
         >
-          <Search size={18} color={theme.colors.primary} />
+          <Search size={17} color={theme.colors.primary} />
         </Pressable>
 
         <Pressable
-          style={[styles.headerButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+          style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
           onPress={() => navigation.navigate("Notifications")}
         >
-          <Bell size={18} color={theme.colors.primary} />
+          <Bell size={17} color={theme.colors.primary} />
         </Pressable>
       </View>
 
-      {loadingState ? (
-        <View style={[styles.loadingWrap, { paddingTop: listTopPad + 14 }]}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View
-              key={`skeleton-${index}`}
-              style={[styles.loadingCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            >
-              <LoadingSkeleton width={140} height={16} />
-              <View style={styles.loadingGap} />
-              <LoadingSkeleton width="100%" height={12} />
-              <View style={styles.loadingGap} />
-              <LoadingSkeleton width="90%" height={12} />
-            </View>
-          ))}
-        </View>
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      {loading && posts.length === 0 ? (
+        <View style={[styles.skeletonWrap, { paddingTop: listTopPad + 72 }]}>{skeletonCards}</View>
       ) : (
         <FlatList
           data={posts}
@@ -136,21 +147,26 @@ export function HomeFeedScreen() {
           contentContainerStyle={[styles.listContent, { paddingTop: listTopPad }]}
           onEndReached={fetchMoreFeed}
           onEndReachedThreshold={0.5}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshFeed} tintColor={theme.colors.primary} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshFeed}
+              tintColor={theme.colors.primary}
+              progressViewOffset={listTopPad}
+            />
+          }
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
-            <GlassCard style={styles.emptyCard}>
-              <View style={styles.emptyIcon}>
-                <Sparkles size={20} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Your feed is ready</Text>
-              <Text style={[styles.emptyBody, { color: theme.colors.textSecondary }]}>
-                Follow professionals, explore cases, or publish the first update for your network.
-              </Text>
-            </GlassCard>
+            <EmptyState
+              icon={<Stethoscope size={30} color={theme.colors.primary} />}
+              title="Your feed is empty"
+              body="Follow medical professionals or publish the first post to get started."
+              ctaLabel="Explore Professionals"
+              onCta={() => navigation.navigate("Discover")}
+              style={styles.emptyState}
+            />
           }
           showsVerticalScrollIndicator={false}
-          // ─── Performance props ───────────────────────────────────────
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={7}
@@ -158,11 +174,17 @@ export function HomeFeedScreen() {
         />
       )}
 
+      {/* ── FAB ─────────────────────────────────────────────────────── */}
       <Pressable
         onPress={() => navigation.navigate("CreatePost")}
-        style={[styles.createButtonWrap, { bottom: insets.bottom + 20 }]}
+        style={[styles.fabWrap, { bottom: insets.bottom + 20 }]}
       >
-        <LinearGradient colors={theme.gradients.primary} style={[styles.createButton, theme.shadow.floating]}>
+        <LinearGradient
+          colors={theme.gradients.primary}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.fab, theme.shadow.floating]}
+        >
           <Plus size={22} color="#FFFFFF" />
         </LinearGradient>
       </Pressable>
@@ -171,95 +193,90 @@ export function HomeFeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1
-  },
-  topAura: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 240
-  },
+  container: { flex: 1 },
   actionsCluster: {
     position: "absolute",
-    right: 18,
+    right: 16,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     zIndex: 20
   },
   headerButton: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderWidth: 1,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 120
-  },
-  headerWrap: {
-    marginBottom: 18
-  },
-  emptyCard: {
-    marginTop: 8,
-    alignItems: "center"
-  },
-  emptyIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(37, 99, 235, 0.12)"
+    // Slight shadow on action buttons
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2
   },
-  emptyTitle: {
-    marginTop: 12,
-    textAlign: "center",
+  // ── Feed header
+  feedHeader: {
+    paddingBottom: 16,
+    paddingTop: 4
+  },
+  feedTitle: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 18
+    fontSize: 26
   },
-  emptyBody: {
-    marginTop: 6,
-    textAlign: "center",
+  feedSub: {
+    marginTop: 4,
     fontFamily: "Manrope_500Medium",
-    fontSize: 13,
-    lineHeight: 20
+    fontSize: 13
   },
-  headerTitle: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 27,
-    lineHeight: 34
+  // ── List
+  listContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 110
   },
-  headerSubtitle: {
-    marginTop: 8,
-    fontFamily: "Manrope_500Medium",
-    fontSize: 14,
-    lineHeight: 21
+  emptyState: {
+    marginTop: 16
   },
-  createButtonWrap: {
-    position: "absolute",
-    right: 18
+  // ── Skeleton
+  skeletonWrap: {
+    paddingHorizontal: 14,
+    gap: 10
   },
-  createButton: {
-    width: 58,
-    height: 58,
+  skeletonCard: {
+    borderWidth: 1,
     borderRadius: 20,
+    padding: 14,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2
+  },
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  skeletonMeta: {
+    flex: 1
+  },
+  skeletonActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 10
+  },
+  // ── FAB
+  fabWrap: {
+    position: "absolute",
+    right: 16
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center"
-  },
-  loadingWrap: {
-    paddingHorizontal: 16,
-    gap: 12
-  },
-  loadingCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14
-  },
-  loadingGap: {
-    height: 8
   }
 });

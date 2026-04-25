@@ -4,16 +4,19 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native";
-import { Plus } from "lucide-react-native";
+import { Briefcase, Plus } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { AnimatedButton } from "@/components/common/AnimatedButton";
+import { EmptyState } from "@/components/common/EmptyState";
 import { JobCard } from "@/components/jobs/JobCard";
 import { useJobsStore } from "@/store/jobsStore";
 import { hapticSuccess } from "@/utils/haptics";
@@ -41,18 +44,13 @@ export function JobsScreen() {
   }, [fetchJobs]);
 
   const filteredJobs = useMemo(() => {
-    if (filter === "All") {
-      return jobs;
-    }
-
-    if (filter === "Remote") {
+    if (filter === "All") return jobs;
+    if (filter === "Remote")
       return jobs.filter((job) => job.location.toLowerCase().includes("remote"));
-    }
-
-    if (filter === "High Pay") {
-      return jobs.filter((job) => /\d/.test(job.salary) && Number(job.salary.replace(/\D/g, "")) >= 90000);
-    }
-
+    if (filter === "High Pay")
+      return jobs.filter(
+        (job) => /\d/.test(job.salary) && Number(job.salary.replace(/\D/g, "")) >= 90000
+      );
     return jobs.filter((job) => job.hospital.length > 0);
   }, [filter, jobs]);
 
@@ -62,12 +60,8 @@ export function JobsScreen() {
   };
 
   const handleCreateJob = async () => {
-    if (!title.trim() || !hospital.trim() || !location.trim() || !description.trim()) {
-      return;
-    }
-
+    if (!title.trim() || !hospital.trim() || !location.trim() || !description.trim()) return;
     await createJob({ title, hospital, location, salary, description });
-
     setShowModal(false);
     setTitle("");
     setHospital("");
@@ -78,54 +72,70 @@ export function JobsScreen() {
   };
 
   const renderItem = useCallback(
-    ({ item }: { item: Job }) => <JobCard job={item} onApply={handleApply} />,
+    ({ item, index }: { item: Job; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(index * 40).duration(280).springify()}>
+        <JobCard job={item} onApply={handleApply} />
+      </Animated.View>
+    ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header with safe area top inset */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Medical Job Board</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Find trusted opportunities</Text>
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: insets.top + 14, borderBottomColor: theme.colors.borderLight }]}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Job Board</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+              {filteredJobs.length} {filteredJobs.length === 1 ? "opening" : "openings"}
+            </Text>
+          </View>
+
+          <Pressable
+            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => setShowModal(true)}
+          >
+            <Plus size={18} color="#FFFFFF" />
+          </Pressable>
         </View>
 
-        <Pressable style={[styles.addButton, { backgroundColor: theme.colors.primary }]} onPress={() => setShowModal(true)}>
-          <Plus size={18} color="#FFFFFF" />
-        </Pressable>
-      </View>
-
-      <View style={styles.filtersWrap}>
-        {filters.map((filterItem) => {
-          const active = filterItem === filter;
-
-          return (
-            <Pressable
-              key={filterItem}
-              onPress={() => setFilter(filterItem)}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: active ? theme.colors.primary : theme.colors.surface,
-                  borderColor: active ? theme.colors.primary : theme.colors.border
-                }
-              ]}
-            >
-              <Text
+        {/* Filter chips — horizontal scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersWrap}
+          style={styles.filtersScroll}
+        >
+          {filters.map((filterItem) => {
+            const active = filterItem === filter;
+            return (
+              <Pressable
+                key={filterItem}
+                onPress={() => setFilter(filterItem)}
                 style={[
-                  styles.filterText,
+                  styles.filterChip,
                   {
-                    color: active ? "#FFFFFF" : theme.colors.textSecondary
+                    backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                    borderColor: active ? theme.colors.primary : theme.colors.cardBorder,
+                    // Slight shadow on active chip
+                    ...(active ? theme.shadow.card : {})
                   }
                 ]}
               >
-                {filterItem}
-              </Text>
-            </Pressable>
-          );
-        })}
+                <Text
+                  style={[
+                    styles.filterText,
+                    { color: active ? "#FFFFFF" : theme.colors.textSecondary }
+                  ]}
+                >
+                  {filterItem}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -134,32 +144,82 @@ export function JobsScreen() {
         contentContainerStyle={styles.listContent}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        // ─── Performance props ─────────────────────────────────────
+        ListEmptyComponent={
+          <EmptyState
+            icon={<Briefcase size={30} color={theme.colors.primary} />}
+            title="No openings yet"
+            body={
+              filter !== "All"
+                ? `No jobs match the "${filter}" filter. Try a different category.`
+                : "Be the first to post a medical opportunity for your institution."
+            }
+            ctaLabel={filter !== "All" ? "Show All Jobs" : "Post a Job"}
+            onCta={filter !== "All" ? () => setFilter("All") : () => setShowModal(true)}
+          />
+        }
         initialNumToRender={6}
         maxToRenderPerBatch={6}
         windowSize={9}
         removeClippedSubviews={Platform.OS === "android"}
       />
 
-      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+      {/* ── Create job modal ─────────────────────────────────────────── */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}
+      >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Create Job Posting</Text>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.cardBorder }
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Post a Job</Text>
 
-            <TextInput value={title} onChangeText={setTitle} placeholder="Job title" style={[styles.modalInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]} />
-            <TextInput value={hospital} onChangeText={setHospital} placeholder="Hospital" style={[styles.modalInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]} />
-            <TextInput value={location} onChangeText={setLocation} placeholder="Location" style={[styles.modalInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]} />
-            <TextInput value={salary} onChangeText={setSalary} placeholder="Salary" style={[styles.modalInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]} />
+            {(
+              [
+                { value: title, setter: setTitle, placeholder: "Job title" },
+                { value: hospital, setter: setHospital, placeholder: "Hospital / Institution" },
+                { value: location, setter: setLocation, placeholder: "Location or Remote" },
+                { value: salary, setter: setSalary, placeholder: "Salary range (optional)" }
+              ] as { value: string; setter: (v: string) => void; placeholder: string }[]
+            ).map(({ value, setter, placeholder }) => (
+              <TextInput
+                key={placeholder}
+                value={value}
+                onChangeText={setter}
+                placeholder={placeholder}
+                placeholderTextColor={theme.colors.textTertiary}
+                style={[
+                  styles.modalInput,
+                  { color: theme.colors.textPrimary, borderColor: theme.colors.cardBorder }
+                ]}
+              />
+            ))}
+
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Description"
+              placeholder="Job description"
+              placeholderTextColor={theme.colors.textTertiary}
               multiline
-              style={[styles.modalInput, styles.modalInputLarge, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.modalInput,
+                styles.modalInputLarge,
+                { color: theme.colors.textPrimary, borderColor: theme.colors.cardBorder }
+              ]}
             />
 
             <AnimatedButton title="Publish Job" onPress={handleCreateJob} />
-            <AnimatedButton title="Cancel" variant="ghost" style={styles.modalCancel} onPress={() => setShowModal(false)} />
+            <AnimatedButton
+              title="Cancel"
+              variant="ghost"
+              style={styles.modalCancel}
+              onPress={() => setShowModal(false)}
+            />
           </View>
         </View>
       </Modal>
@@ -168,83 +228,80 @@ export function JobsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1
-  },
+  container: { flex: 1 },
   header: {
+    paddingBottom: 0,
+    borderBottomWidth: 1
+  },
+  headerTop: {
     paddingHorizontal: 16,
     paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between"
   },
-  title: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 25
-  },
-  subtitle: {
-    marginTop: 4,
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13
-  },
+  title: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 27 },
+  subtitle: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13 },
   addButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4
   },
+  filtersScroll: { paddingBottom: 10 },
   filtersWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
     paddingHorizontal: 16,
-    paddingBottom: 10
+    gap: 8,
+    flexDirection: "row"
   },
   filterChip: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 7
   },
-  filterText: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 12
-  },
+  filterText: { fontFamily: "Manrope_700Bold", fontSize: 12 },
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     paddingBottom: 120
   },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.35)"
+    backgroundColor: "rgba(15, 23, 42, 0.45)"
   },
   modalCard: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 16,
-    borderWidth: 1
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    padding: 20,
+    borderWidth: 1,
+    gap: 0
   },
   modalTitle: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 19,
-    marginBottom: 10
+    fontSize: 20,
+    marginBottom: 14
   },
   modalInput: {
     borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 44,
+    borderRadius: 14,
+    minHeight: 48,
     marginBottom: 10,
-    paddingHorizontal: 12,
-    fontFamily: "Manrope_500Medium"
+    paddingHorizontal: 14,
+    fontFamily: "Manrope_500Medium",
+    fontSize: 15
   },
   modalInputLarge: {
-    minHeight: 92,
+    minHeight: 96,
     textAlignVertical: "top",
-    paddingTop: 12
+    paddingTop: 14
   },
-  modalCancel: {
-    marginTop: 10
-  }
+  modalCancel: { marginTop: 10 }
 });
