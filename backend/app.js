@@ -10,6 +10,7 @@ const jobRoutes = require("./routes/jobRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
 
 // Configure Cloudinary from environment variables.
@@ -34,8 +35,10 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
+const path = require("path");
+
 // Serve locally-saved uploads as a static fallback (future use / dev fallback)
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ success: true, message: "Doctor,s App backend is healthy" });
@@ -48,6 +51,7 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

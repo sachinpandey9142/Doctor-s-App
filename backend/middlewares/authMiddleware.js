@@ -19,6 +19,15 @@ const authMiddleware = catchAsync(async (req, _res, next) => {
     throw new ApiError(401, "Invalid authentication token");
   }
 
+  if (user.isBlocked) {
+    throw new ApiError(403, "Your account has been blocked.");
+  }
+
+  const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
+  if (!user.isVerified && Date.now() - new Date(user.createdAt).getTime() > GRACE_PERIOD_MS) {
+    throw new ApiError(403, "Your 24-hour grace period has expired. Please wait for verification.");
+  }
+
   req.user = user;
   next();
 });

@@ -5,7 +5,8 @@ import {
   createPostRequest,
   getCasePosts,
   getFeedPosts,
-  likePostRequest
+  likePostRequest,
+  deletePostRequest
 } from "@/services/api/postApi";
 import { useAuthStore } from "@/store/authStore";
 import { useToastStore, extractErrorMessage } from "@/store/toastStore";
@@ -33,6 +34,7 @@ interface FeedState {
   }) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   addComment: (postId: string, text: string) => Promise<Comment>;
+  deletePost: (postId: string) => Promise<void>;
 }
 
 const mergeUniquePosts = (existing: Post[], incoming: Post[]) => {
@@ -202,5 +204,23 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }));
 
     return comment;
+  },
+
+  deletePost: async (postId) => {
+    // Optimistic delete
+    const { posts, casePosts } = get();
+    set({
+      posts: posts.filter((p) => p._id !== postId),
+      casePosts: casePosts.filter((p) => p._id !== postId)
+    });
+
+    try {
+      await deletePostRequest(postId);
+      useToastStore.getState().showToast("Post deleted successfully", "success");
+    } catch (error) {
+      // Revert if failed
+      set({ posts, casePosts });
+      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to delete post"), "error");
+    }
   }
 }));

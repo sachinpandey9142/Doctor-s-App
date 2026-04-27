@@ -15,6 +15,11 @@ export const createConversationRequest = async (participantId: string): Promise<
   return response.data.data;
 };
 
+export const joinCaseChatRequest = async (postId: string): Promise<Conversation> => {
+  const response = await apiClient.post<ApiResponse<Conversation>>(`/case/${postId}`);
+  return response.data.data;
+};
+
 export const getConversationsRequest = async (): Promise<Conversation[]> => {
   const response = await apiClient.get<ApiResponse<Conversation[]>>("/conversations");
   return response.data.data;

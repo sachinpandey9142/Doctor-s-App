@@ -14,18 +14,20 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { useTheme } from "styled-components/native";
-import { CheckCircle, ImagePlus, XCircle } from "lucide-react-native";
+import { ImagePlus, XCircle, PlayCircle, Video } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
-import { AnimatedButton } from "@/components/common/AnimatedButton";
 import { GlassCard } from "@/components/common/GlassCard";
 import { useFeedStore } from "@/store/feedStore";
 import { uploadImageRequest } from "@/services/api/uploadApi";
-import { hapticSuccess, hapticWarning } from "@/utils/haptics";
+import { hapticSuccess, hapticWarning, hapticTap } from "@/utils/haptics";
 
 type PostTag = "text" | "image" | "video" | "case";
-
 const tags: PostTag[] = ["text", "image", "video", "case"];
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function CreatePostScreen() {
   const theme = useTheme();
@@ -34,25 +36,30 @@ export function CreatePostScreen() {
 
   const [content, setContent] = useState("");
   const [postType, setPostType] = useState<PostTag>("text");
-  // localMediaUri holds the local file:// URI for preview only
+  
   const [localMediaUri, setLocalMediaUri] = useState("");
-  // uploadedMediaUrl holds the Cloudinary URL returned after upload
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  
   const [symptoms, setSymptoms] = useState("");
   const [observations, setObservations] = useState("");
+  const [notes, setNotes] = useState("");
   const [anonymousCase, setAnonymousCase] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const buttonScale = useSharedValue(1);
+
   const canSubmit = useMemo(() => {
-    if (!content.trim()) {
-      return false;
-    }
-    if (postType === "case") {
-      return !!symptoms.trim() && !!observations.trim();
-    }
+    if (!content.trim()) return false;
+    if (postType === "case") return !!symptoms.trim() && !!observations.trim();
+    if (postType === "image" || postType === "video") return !!localMediaUri || !!uploadedMediaUrl;
     return true;
-  }, [content, observations, postType, symptoms]);
+  }, [content, observations, postType, symptoms, localMediaUri, uploadedMediaUrl]);
+
+  const handlePostTypeChange = (tag: PostTag) => {
+    hapticTap();
+    setPostType(tag);
+  };
 
   const pickMedia = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,7 +69,7 @@ export function CreatePostScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: postType === "video" ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: true
     });
@@ -70,16 +77,13 @@ export function CreatePostScreen() {
     if (!result.canceled && result.assets?.length) {
       const uri = result.assets[0].uri;
       setLocalMediaUri(uri);
-      setUploadedMediaUrl(""); // reset any previous upload
-
-      // Upload immediately so the user doesn't wait at submit time
+      setUploadedMediaUrl("");
       setUploading(true);
       try {
-        const cloudUrl = await uploadImageRequest(uri);
+        const cloudUrl = await uploadImageRequest(uri); 
         setUploadedMediaUrl(cloudUrl);
         hapticSuccess();
       } catch {
-        // If upload fails, clear selection so user doesn't get a broken post
         setLocalMediaUri("");
         setUploadedMediaUrl("");
         hapticWarning();
@@ -90,6 +94,7 @@ export function CreatePostScreen() {
   };
 
   const clearMedia = () => {
+    hapticTap();
     setLocalMediaUri("");
     setUploadedMediaUrl("");
   };
@@ -99,8 +104,6 @@ export function CreatePostScreen() {
       hapticWarning();
       return;
     }
-
-    // Block submission if the user selected an image but upload hasn't finished
     if (localMediaUri && !uploadedMediaUrl && !uploading) {
       hapticWarning();
       return;
@@ -108,35 +111,33 @@ export function CreatePostScreen() {
 
     try {
       setLoading(true);
+      const finalObservations = notes.trim() ? `${observations}\n\n**Notes / Advice:**\n${notes}` : observations;
+      
       await createPost({
         content,
-        mediaUrl: uploadedMediaUrl, // Cloudinary URL, or "" if no image
+        mediaUrl: uploadedMediaUrl,
         type: postType,
         symptoms,
-        observations,
+        observations: finalObservations,
         isAnonymous: anonymousCase,
         reportImages: uploadedMediaUrl ? [uploadedMediaUrl] : []
       });
 
       hapticSuccess();
+      setContent("");
+      setSymptoms("");
+      setObservations("");
+      setNotes("");
+      clearMedia();
       navigation.goBack();
     } finally {
       setLoading(false);
     }
   };
 
-  const mediaButtonLabel = () => {
-    if (uploading) {
-      return "Uploading image...";
-    }
-    if (uploadedMediaUrl) {
-      return "Image uploaded ✓";
-    }
-    if (localMediaUri) {
-      return "Upload in progress";
-    }
-    return "Attach image";
-  };
+  const onPressIn = () => { buttonScale.value = withSpring(0.95); };
+  const onPressOut = () => { buttonScale.value = withSpring(1); };
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
 
   return (
     <KeyboardAvoidingView
@@ -144,74 +145,70 @@ export function CreatePostScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-        <GlassCard >
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Share with your medical network</Text>
+        
+        <View style={styles.tabContainer}>
+          {tags.map((tag) => {
+            const active = tag === postType;
+            return (
+              <Pressable
+                key={tag}
+                onPress={() => handlePostTypeChange(tag)}
+                style={[
+                  styles.tabChip,
+                  active && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                ]}
+              >
+                <Text style={[styles.tabText, active && { color: "#FFFFFF" }, !active && { color: theme.colors.textSecondary }]}>
+                  {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
+        <GlassCard padded={false} style={styles.card}>
           <TextInput
             value={content}
             onChangeText={setContent}
-            placeholder="What are you learning, observing, or discussing today?"
+            placeholder="Share your knowledge..."
             placeholderTextColor={theme.colors.textSecondary}
             multiline
-            style={[styles.textArea, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+            style={[styles.textArea, { color: theme.colors.textPrimary }]}
           />
 
-          <View style={styles.tagRow}>
-            {tags.map((tag) => {
-              const active = tag === postType;
-
-              return (
-                <Pressable
-                  key={tag}
-                  onPress={() => setPostType(tag)}
-                  style={[
-                    styles.tagChip,
-                    {
-                      backgroundColor: active ? theme.colors.primary : "rgba(255,255,255,0.75)",
-                      borderColor: active ? theme.colors.primary : theme.colors.border
-                    }
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.tagText,
-                      {
-                        color: active ? "#FFFFFF" : theme.colors.textPrimary
-                      }
-                    ]}
-                  >
-                    #{tag}
+          {(postType === "image" || postType === "video" || postType === "case") && !localMediaUri && (
+            <Pressable
+              style={[
+                styles.mediaPickerDashed,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundAlt }
+              ]}
+              onPress={uploading ? undefined : pickMedia}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              ) : (
+                <>
+                  {postType === "video" ? <Video size={24} color={theme.colors.textSecondary} /> : <ImagePlus size={24} color={theme.colors.textSecondary} />}
+                  <Text style={[styles.mediaText, { color: theme.colors.textSecondary }]}>
+                    Add {postType === "video" ? "Video" : "Image"}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                </>
+              )}
+            </Pressable>
+          )}
 
-          {/* Image picker + upload status */}
-          <Pressable
-            style={[styles.mediaPicker, { borderColor: uploadedMediaUrl ? theme.colors.success : theme.colors.border }]}
-            onPress={uploading ? undefined : pickMedia}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            ) : uploadedMediaUrl ? (
-              <CheckCircle size={18} color={theme.colors.success} />
-            ) : (
-              <ImagePlus size={18} color={theme.colors.primary} />
-            )}
-            <Text style={[styles.mediaText, { color: theme.colors.textSecondary }]}>
-              {mediaButtonLabel()}
-            </Text>
-          </Pressable>
-
-          {/* Image preview with remove button */}
           {localMediaUri ? (
             <View style={styles.previewWrap}>
               <Image source={{ uri: localMediaUri }} style={styles.previewImage} contentFit="cover" />
+              {postType === "video" && (
+                <View style={styles.videoOverlay}>
+                  <PlayCircle size={48} color="#FFFFFF" opacity={0.8} />
+                </View>
+              )}
               {!uploading && (
-                <Pressable onPress={clearMedia} style={styles.removeImageButton}>
-                  <XCircle size={22} color={theme.colors.error} />
+                <Pressable onPress={clearMedia} style={styles.removeImageBadge}>
+                  <XCircle size={28} color={theme.colors.error} fill="#FFFFFF" />
                 </Pressable>
               )}
               {uploading && (
@@ -225,28 +222,41 @@ export function CreatePostScreen() {
 
           {postType === "case" ? (
             <View style={styles.caseWrap}>
-              <Text style={[styles.caseTitle, { color: theme.colors.primary }]}>Case Details</Text>
+              <View style={[styles.caseInputCard, { backgroundColor: theme.colors.backgroundAlt, borderColor: theme.colors.border }]}>
+                <Text style={[styles.caseLabel, { color: theme.colors.textSecondary }]}>Symptoms</Text>
+                <TextInput
+                  value={symptoms}
+                  onChangeText={setSymptoms}
+                  placeholder="E.g., Fever, persistent cough"
+                  placeholderTextColor={theme.colors.textTertiary}
+                  multiline
+                  style={[styles.caseInput, { color: theme.colors.textPrimary }]}
+                />
+              </View>
 
-              <TextInput
-                value={symptoms}
-                onChangeText={setSymptoms}
-                placeholder="Symptoms"
-                placeholderTextColor={theme.colors.textSecondary}
-                style={[styles.caseInput, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
-              />
+              <View style={[styles.caseInputCard, { backgroundColor: theme.colors.backgroundAlt, borderColor: theme.colors.border }]}>
+                <Text style={[styles.caseLabel, { color: theme.colors.textSecondary }]}>Observations</Text>
+                <TextInput
+                  value={observations}
+                  onChangeText={setObservations}
+                  placeholder="E.g., Elevated HR, clear lungs"
+                  placeholderTextColor={theme.colors.textTertiary}
+                  multiline
+                  style={[styles.caseInput, { color: theme.colors.textPrimary, minHeight: 60 }]}
+                />
+              </View>
 
-              <TextInput
-                value={observations}
-                onChangeText={setObservations}
-                placeholder="Observations"
-                placeholderTextColor={theme.colors.textSecondary}
-                multiline
-                style={[
-                  styles.caseInput,
-                  styles.caseInputLarge,
-                  { borderColor: theme.colors.border, color: theme.colors.textPrimary }
-                ]}
-              />
+              <View style={[styles.caseInputCard, { backgroundColor: theme.colors.backgroundAlt, borderColor: theme.colors.border }]}>
+                <Text style={[styles.caseLabel, { color: theme.colors.textSecondary }]}>Notes / Advice</Text>
+                <TextInput
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Additional context or recommendations"
+                  placeholderTextColor={theme.colors.textTertiary}
+                  multiline
+                  style={[styles.caseInput, { color: theme.colors.textPrimary }]}
+                />
+              </View>
 
               <View style={styles.switchRow}>
                 <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Post anonymously</Text>
@@ -254,132 +264,188 @@ export function CreatePostScreen() {
               </View>
             </View>
           ) : null}
-
-          <AnimatedButton
-            title="Publish"
-            loading={loading || uploading}
-            disabled={!canSubmit || uploading || (!!localMediaUri && !uploadedMediaUrl)}
-            onPress={submitPost}
-            style={styles.publishButton}
-          />
         </GlassCard>
       </ScrollView>
+
+      <View style={[styles.actionBar, { borderTopColor: theme.colors.borderLight, backgroundColor: theme.colors.background }]}>
+        <AnimatedPressable
+          onPress={submitPost}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          disabled={!canSubmit || uploading || (!!localMediaUri && !uploadedMediaUrl) || loading}
+          style={[buttonAnimatedStyle, styles.publishBtnWrapper]}
+        >
+          <LinearGradient
+            colors={
+              (!canSubmit || uploading || (!!localMediaUri && !uploadedMediaUrl) || loading)
+                ? [theme.colors.border, theme.colors.border]
+                : [theme.colors.primary, "#6366F1"] 
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.publishGradient}
+          >
+            {loading || uploading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.publishText}>Publish Post</Text>
+            )}
+          </LinearGradient>
+        </AnimatedPressable>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1
+  container: { flex: 1 },
+  contentContainer: { padding: 16, paddingBottom: 110 },
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    justifyContent: "space-between"
   },
-  contentContainer: {
+  tabChip: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent"
+  },
+  tabText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 13
+  },
+  card: {
     padding: 16,
-    paddingBottom: 40
-  },
-  title: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 22,
-    marginBottom: 14
+    borderRadius: 20
   },
   textArea: {
-    minHeight: 130,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
+    minHeight: 120,
+    fontSize: 17,
     textAlignVertical: "top",
     fontFamily: "Manrope_500Medium"
   },
-  tagRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14
-  },
-  tagChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  tagText: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 12
-  },
-  mediaPicker: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderRadius: 14,
-    minHeight: 48,
-    flexDirection: "row",
+  mediaPickerDashed: {
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderRadius: 16,
+    minHeight: 80,
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8
   },
   mediaText: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13
+    fontFamily: "Manrope_600SemiBold",
+    fontSize: 15
   },
   previewWrap: {
-    marginTop: 12,
+    marginTop: 16,
     borderRadius: 16,
     overflow: "hidden",
-    height: 200
+    height: 240,
+    width: "100%",
+    position: "relative"
   },
   previewImage: {
     width: "100%",
     height: "100%"
   },
-  removeImageButton: {
+  removeImageBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: 999,
-    padding: 2
+    top: 10,
+    right: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 20
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center"
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15,23,42,0.55)",
+    backgroundColor: "rgba(15,23,42,0.6)",
     alignItems: "center",
     justifyContent: "center",
     gap: 10
   },
   uploadingText: {
     color: "#FFFFFF",
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13
+    fontFamily: "Manrope_600SemiBold",
+    fontSize: 14
   },
   caseWrap: {
     marginTop: 16,
-    gap: 10
+    gap: 12
   },
-  caseTitle: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 15
-  },
-  caseInput: {
+  caseInputCard: {
     borderWidth: 1,
     borderRadius: 14,
-    minHeight: 46,
-    paddingHorizontal: 12,
-    fontFamily: "Manrope_500Medium"
+    padding: 12
   },
-  caseInputLarge: {
-    minHeight: 90,
-    textAlignVertical: "top",
-    paddingTop: 12
+  caseLabel: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4
+  },
+  caseInput: {
+    fontFamily: "Manrope_500Medium",
+    fontSize: 15,
+    minHeight: 24,
+    textAlignVertical: "top"
   },
   switchRow: {
-    marginTop: 2,
+    marginTop: 8,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center"
   },
   switchLabel: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13
+    fontFamily: "Manrope_600SemiBold",
+    fontSize: 14
   },
-  publishButton: {
-    marginTop: 18
+  actionBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 34 : 16,
+    borderTopWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 10
+  },
+  publishBtnWrapper: {
+    borderRadius: 16,
+    overflow: "hidden"
+  },
+  publishGradient: {
+    minHeight: 56,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  publishText: {
+    color: "#FFFFFF",
+    fontFamily: "SpaceGrotesk_700Bold",
+    fontSize: 17
   }
 });

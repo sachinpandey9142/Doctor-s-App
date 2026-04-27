@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import {
   NavigationContainer,
   DefaultTheme,
@@ -13,7 +13,6 @@ import {
   ClipboardPlus,
   House,
   MessageCircleMore,
-  Search,
   UserRound
 } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
@@ -33,6 +32,9 @@ import { ChatScreen } from "@/screens/chat/ChatScreen";
 import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
 import { SearchScreen } from "@/screens/discovery/SearchScreen";
 import { CommentsScreen } from "@/screens/feed/CommentsScreen";
+import { AdminPanelScreen } from "@/screens/admin/AdminPanelScreen";
+import { CaseDiscussionThreadScreen } from "@/screens/feed/CaseDiscussionThreadScreen";
+import { CaseDetailScreen } from "@/screens/feed/CaseDetailScreen";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -54,41 +56,45 @@ function MainTabsNavigator() {
     <MainTab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarStyle: {
-          height: 72,
-          paddingTop: 10,
-          paddingBottom: 10,
+          height: Platform.OS === "ios" ? 88 : 68,
+          paddingTop: 0,
+          paddingBottom: Platform.OS === "ios" ? 20 : 0,
           borderTopWidth: 0,
-          backgroundColor: "rgba(255,255,255,0.95)"
+          backgroundColor: "rgba(255,255,255,0.98)",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          elevation: 16
         },
-        tabBarLabel: ({ color, focused }) => (
-          <Text
-            style={{
-              color,
-              fontFamily: focused ? "Manrope_700Bold" : "Manrope_500Medium",
-              fontSize: 11,
-              marginTop: 4
-            }}
-          >
-            {route.name.replace("Feed", "")}
-          </Text>
-        ),
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, focused, size }) => {
+          const iconSize = 24;
+          let Icon: React.ReactNode;
           switch (route.name) {
             case "HomeFeed":
-              return <House color={color} size={size} />;
+              Icon = <House color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
+              break;
             case "CaseDiscussion":
-              return <ClipboardPlus color={color} size={size} />;
+              Icon = <ClipboardPlus color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
+              break;
             case "Jobs":
-              return <Briefcase color={color} size={size} />;
+              Icon = <Briefcase color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
+              break;
             case "ChatList":
-              return <MessageCircleMore color={color} size={size} />;
+              Icon = <MessageCircleMore color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
+              break;
             default:
-              return <UserRound color={color} size={size} />;
+              Icon = <UserRound color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
           }
+          return (
+            <View style={[tabStyles.iconWrap, focused && { backgroundColor: theme.colors.primaryLight }]}>
+              {Icon}
+            </View>
+          );
         }
       })}
     >
@@ -100,6 +106,16 @@ function MainTabsNavigator() {
     </MainTab.Navigator>
   );
 }
+
+const tabStyles = StyleSheet.create({
+  iconWrap: {
+    width: 50,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center"
+  }
+});
 
 function MainStackNavigator() {
   const theme = useTheme();
@@ -119,18 +135,26 @@ function MainStackNavigator() {
       }}
     >
       <RootStack.Screen name="MainTabs" component={MainTabsNavigator} options={{ headerShown: false }} />
+      <RootStack.Screen name="AdminPanel" component={AdminPanelScreen} options={{ title: "Admin Dashboard" }} />
       <RootStack.Screen name="CreatePost" component={CreatePostScreen} options={{ title: "Create Post" }} />
       <RootStack.Screen
         name="Discover"
         component={SearchScreen}
-        options={{
-          title: "Discover",
-          headerRight: () => <Search size={18} color={theme.colors.primary} />
-        }}
+        options={{ title: "Discover" }}
       />
       <RootStack.Screen name="UserProfile" component={ProfileScreen} options={{ title: "Profile" }} />
       <RootStack.Screen name="Comments" component={CommentsScreen} options={{ title: "Discussion" }} />
       <RootStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: "Conversation" }} />
+      <RootStack.Screen
+        name="CaseDiscussionThread"
+        component={CaseDiscussionThreadScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="CaseDetail"
+        component={CaseDetailScreen}
+        options={{ headerShown: false }}
+      />
       <RootStack.Screen
         name="Notifications"
         component={NotificationsScreen}

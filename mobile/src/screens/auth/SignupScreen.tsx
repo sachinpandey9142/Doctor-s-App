@@ -12,7 +12,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { UserPlus } from "lucide-react-native";
+import { UserPlus, ImagePlus, CheckCircle } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+
+import { uploadImageRequest } from "@/services/api/uploadApi";
 
 import { AnimatedButton } from "@/components/common/AnimatedButton";
 import { FloatingInput } from "@/components/common/FloatingInput";
@@ -43,8 +46,45 @@ export function SignupScreen() {
   const [specialization, setSpecialization] = useState("");
   const [hospital, setHospital] = useState("");
   const [role, setRole] = useState<MedicalRole>("doctor");
+  const [idDocumentUri, setIdDocumentUri] = useState("");
+  const [uploadedIdUrl, setUploadedIdUrl] = useState("");
+  const [uploadingId, setUploadingId] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const pickIdDocument = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      hapticWarning();
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true
+    });
+
+    if (!result.canceled && result.assets?.length) {
+      const uri = result.assets[0].uri;
+      setIdDocumentUri(uri);
+      setUploadedIdUrl("");
+      setUploadingId(true);
+      
+      try {
+        const cloudUrl = await uploadImageRequest(uri);
+        setUploadedIdUrl(cloudUrl);
+        hapticSuccess();
+      } catch {
+        setIdDocumentUri("");
+        setUploadedIdUrl("");
+        hapticWarning();
+        setError("Failed to upload ID document. Please try again.");
+      } finally {
+        setUploadingId(false);
+      }
+    }
+  };
 
   const roleLabelMap = useMemo(
     () =>
@@ -66,11 +106,19 @@ export function SignupScreen() {
       return;
     }
 
+    if (idDocumentUri && !uploadedIdUrl && !uploadingId) {
+      setError("ID document upload failed or incomplete");
+      hapticWarning();
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
 
-      const result = await registerRequest({ name, email, password, role, specialization, hospital });
+      const result = await registerRequest({ 
+        name, email, password, role, specialization, hospital, idDocument: uploadedIdUrl 
+      });
       await setSession(result);
       hapticSuccess();
     } catch (requestError: any) {
@@ -166,6 +214,33 @@ export function SignupScreen() {
               })}
             </View>
 
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+              Verification (Optional)
+            </Text>
+            <Text style={[styles.helperText, { color: theme.colors.textTertiary, marginBottom: 12 }]}>
+              Upload your medical ID or license to get verified. You have 24 hours to verify your account to post.
+            </Text>
+            
+            <Pressable
+              style={[styles.mediaPicker, { borderColor: uploadedIdUrl ? theme.colors.success : theme.colors.border }]}
+              onPress={uploadingId ? undefined : pickIdDocument}
+              disabled={uploadingId}
+            >
+              {uploadingId ? (
+                <Text style={[styles.mediaText, { color: theme.colors.primary }]}>Uploading...</Text>
+              ) : uploadedIdUrl ? (
+                <>
+                  <CheckCircle size={18} color={theme.colors.success} />
+                  <Text style={[styles.mediaText, { color: theme.colors.textSecondary }]}>ID Uploaded ✓</Text>
+                </>
+              ) : (
+                <>
+                  <ImagePlus size={18} color={theme.colors.primary} />
+                  <Text style={[styles.mediaText, { color: theme.colors.textSecondary }]}>Upload Medical ID</Text>
+                </>
+              )}
+            </Pressable>
+
             {error ? (
               <View style={[styles.errorWrap, { backgroundColor: theme.colors.errorLight, borderColor: "#FCA5A5" }]}>
                 <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
@@ -174,7 +249,8 @@ export function SignupScreen() {
 
             <AnimatedButton
               title="Create Account"
-              loading={loading}
+              loading={loading || uploadingId}
+              disabled={loading || uploadingId || (!!idDocumentUri && !uploadedIdUrl)}
               onPress={handleSignup}
               style={styles.primaryButton}
             />
@@ -284,5 +360,23 @@ const styles = StyleSheet.create({
     fontFamily: "Manrope_500Medium",
     fontSize: 12,
     letterSpacing: 0.2
+  },
+  helperText: {
+    fontFamily: "Manrope_500Medium",
+    fontSize: 12,
+    lineHeight: 18
+  },
+  mediaPicker: {
+    borderWidth: 1,
+    borderRadius: 14,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12
+  },
+  mediaText: {
+    fontFamily: "Manrope_500Medium",
+    fontSize: 13
   }
 });

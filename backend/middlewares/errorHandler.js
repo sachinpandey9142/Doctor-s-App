@@ -5,6 +5,7 @@ const notFoundHandler = (req, _res, next) => {
 };
 
 const errorHandler = (error, _req, res, _next) => {
+  console.error("API Error:", error);
   let statusCode = error.statusCode || 500;
   let message = error.message || "Internal server error";
 

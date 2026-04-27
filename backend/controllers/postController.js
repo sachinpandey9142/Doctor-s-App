@@ -28,6 +28,10 @@ const createPost = catchAsync(async (req, res) => {
     throw new ApiError(400, "Post content is required");
   }
 
+  if (!req.user.isVerified) {
+    throw new ApiError(403, "You must be verified to post.");
+  }
+
   if (type === "case") {
     if (!String(symptoms || "").trim() || !String(observations || "").trim()) {
       throw new ApiError(400, "Case discussion posts require symptoms and observations");
@@ -203,11 +207,31 @@ const getPostComments = catchAsync(async (req, res) => {
   });
 });
 
+const deletePost = catchAsync(async (req, res) => {
+  const post = await Post.findById(req.params.id);
+  if (!post) {
+    throw new ApiError(404, "Post not found");
+  }
+
+  if (String(post.userId) !== String(req.user._id) && req.user.role !== "admin") {
+    throw new ApiError(403, "You do not have permission to delete this post");
+  }
+
+  await Post.findByIdAndDelete(post._id);
+  await Comment.deleteMany({ postId: post._id });
+
+  res.status(200).json({
+    success: true,
+    data: { _id: post._id }
+  });
+});
+
 module.exports = {
   createPost,
   getPosts,
   getCaseDiscussions,
   likePost,
   commentPost,
-  getPostComments
+  getPostComments,
+  deletePost
 };

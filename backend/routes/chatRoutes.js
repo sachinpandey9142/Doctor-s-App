@@ -4,6 +4,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
 const validateRequest = require("../middlewares/validateRequest");
 const {
   createConversation,
+  joinCaseDiscussionChat,
   getConversations,
   getMessages,
   sendMessage
@@ -17,6 +18,7 @@ const {
 const router = express.Router();
 
 router.post("/conversations", authMiddleware, createConversationValidation, validateRequest, createConversation);
+router.post("/case/:postId", authMiddleware, joinCaseDiscussionChat);
 router.get("/conversations", authMiddleware, getConversations);
 router.get(
   "/messages/:conversationId",

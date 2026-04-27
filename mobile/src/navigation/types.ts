@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
+import type { Post } from "@/types/models";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -15,6 +16,7 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
+  AdminPanel: undefined;
   CreatePost: undefined;
   Discover: undefined;
   UserProfile: {
@@ -27,6 +29,15 @@ export type RootStackParamList = {
   ChatScreen: {
     conversationId: string;
     title?: string;
+  };
+  CaseDiscussionThread: {
+    conversationId: string;
+    title?: string;
+    caseAuthor?: string;
+    caseSnippet?: string;
+  };
+  CaseDetail: {
+    post: Post;
   };
   Notifications: undefined;
 };

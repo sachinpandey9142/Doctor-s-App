@@ -15,6 +15,17 @@ const conversationSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
+    isGroup: {
+      type: Boolean,
+      default: false
+    },
+    postId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post"
+    },
+    title: {
+      type: String
+    },
     lastMessage: {
       type: String,
       default: ""

@@ -1,6 +1,7 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const User = require("../models/User");
+const Post = require("../models/Post");
 const ApiError = require("../utils/ApiError");
 const catchAsync = require("../utils/catchAsync");
 const { createNotification } = require("../services/notificationService");
@@ -37,6 +38,56 @@ const createConversation = catchAsync(async (req, res) => {
       "participants",
       "name profileImage role isVerified specialization"
     );
+  }
+
+  res.status(200).json({
+    success: true,
+    data: conversation
+  });
+});
+
+const joinCaseDiscussionChat = catchAsync(async (req, res) => {
+  const postId = req.params.postId;
+
+  const post = await Post.findById(postId).populate("userId", "name");
+  if (!post || post.type !== "case") {
+    throw new ApiError(404, "Case discussion post not found");
+  }
+
+  const participantsHash = `case_${postId}`;
+
+  let conversation = await Conversation.findOne({ participantsHash }).populate(
+    "participants",
+    "name profileImage role isVerified specialization"
+  );
+
+  if (!conversation) {
+    const authorName = post.isAnonymous ? "Anonymous Case" : post.userId.name;
+    conversation = await Conversation.create({
+      participants: [req.user._id],
+      participantsHash,
+      isGroup: true,
+      postId: post._id,
+      title: `${authorName}'s Case Discussion`,
+      lastMessage: ""
+    });
+
+    // populate participants
+    conversation = await Conversation.findById(conversation._id).populate(
+      "participants",
+      "name profileImage role isVerified specialization"
+    );
+  } else {
+    // If conversation exists, check if user is participant, if not, add them
+    if (!conversation.participants.some(p => String(p._id) === String(req.user._id))) {
+      conversation.participants.push(req.user._id);
+      await conversation.save();
+      // repopulate
+      conversation = await Conversation.findById(conversation._id).populate(
+        "participants",
+        "name profileImage role isVerified specialization"
+      );
+    }
   }
 
   res.status(200).json({
@@ -161,6 +212,7 @@ const sendMessage = catchAsync(async (req, res) => {
 
 module.exports = {
   createConversation,
+  joinCaseDiscussionChat,
   getConversations,
   getMessages,
   sendMessage

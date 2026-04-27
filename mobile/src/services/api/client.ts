@@ -35,7 +35,7 @@ apiClient.interceptors.response.use(
   async (error) => {
     const status = error?.response?.status;
 
-    if (status === 401) {
+    if (status === 401 || status === 403) {
       // Dynamically import to break circular dep: authStore imports setAuthToken from here
       const { useAuthStore } = await import("@/store/authStore");
       const logout = useAuthStore.getState().logout;

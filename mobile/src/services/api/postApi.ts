@@ -60,3 +60,7 @@ export const getPostCommentsRequest = async (postId: string): Promise<Comment[]>
   const response = await apiClient.get<ApiResponse<Comment[]>>(`/posts/${postId}/comments`);
   return response.data.data;
 };
+
+export const deletePostRequest = async (postId: string): Promise<void> => {
+  await apiClient.delete(`/posts/${postId}`);
+};

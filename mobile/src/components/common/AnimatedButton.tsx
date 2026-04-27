@@ -44,11 +44,11 @@ export function AnimatedButton({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.96, { damping: 18, stiffness: 320 });
+    scale.value = withSpring(0.95, { damping: 16, stiffness: 340 });
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 18, stiffness: 320 });
+    scale.value = withSpring(1, { damping: 16, stiffness: 340 });
   };
 
   const isDisabled = disabled || loading;
@@ -173,8 +173,8 @@ export function AnimatedButton({
 
 const styles = StyleSheet.create({
   base: {
-    height: 52,
-    borderRadius: 16,
+    height: 48,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -185,19 +185,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.3
+    letterSpacing: 0.2
   },
   secondaryLabel: {
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.2
+    letterSpacing: 0.1
   },
   ghostLabel: {
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.2
+    letterSpacing: 0.1
   },
   disabled: {
-    opacity: 0.5
+    opacity: 0.45
   }
 });

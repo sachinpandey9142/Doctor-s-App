@@ -8,7 +8,8 @@ const {
   getCaseDiscussions,
   likePost,
   commentPost,
-  getPostComments
+  getPostComments,
+  deletePost
 } = require("../controllers/postController");
 const {
   createPostValidation,
@@ -25,5 +26,6 @@ router.get("/cases", authMiddleware, feedValidation, validateRequest, getCaseDis
 router.post("/:id/like", authMiddleware, postIdValidation, validateRequest, likePost);
 router.post("/:id/comment", authMiddleware, commentValidation, validateRequest, commentPost);
 router.get("/:id/comments", authMiddleware, postIdValidation, validateRequest, getPostComments);
+router.delete("/:id", authMiddleware, postIdValidation, validateRequest, deletePost);
 
 module.exports = router;

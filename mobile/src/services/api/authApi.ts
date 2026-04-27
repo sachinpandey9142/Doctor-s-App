@@ -13,6 +13,7 @@ interface RegisterPayload extends AuthPayload {
   specialization?: string;
   hospital?: string;
   experience?: number;
+  idDocument?: string;
 }
 
 interface AuthResult {

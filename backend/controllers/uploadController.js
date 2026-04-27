@@ -3,7 +3,7 @@ const ApiError = require("../utils/ApiError");
 const catchAsync = require("../utils/catchAsync");
 
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 
 const uploadImage = catchAsync(async (req, res) => {
   if (!req.file) {
@@ -18,23 +18,18 @@ const uploadImage = catchAsync(async (req, res) => {
     throw new ApiError(400, "File exceeds the 5 MB size limit");
   }
 
-  // Cloudinary credentials come from env vars — configured in app.js startup
-  const result = await new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: "doctors-app",
-        allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
-        transformation: [{ quality: "auto:good", fetch_format: "auto" }]
-      },
-      (error, uploadResult) => {
-        if (error) {
-          return reject(new ApiError(500, `Cloudinary upload failed: ${error.message}`));
-        }
-        resolve(uploadResult);
-      }
-    );
+  // multer v2 stores files as Uint8Array — convert to Buffer then base64 data URI
+  // upload_stream is broken with Uint8Array in multer v2; uploader.upload with data URI works reliably
+  const buffer = Buffer.isBuffer(req.file.buffer)
+    ? req.file.buffer
+    : Buffer.from(req.file.buffer);
 
-    stream.end(req.file.buffer);
+  const dataUri = `data:${req.file.mimetype};base64,${buffer.toString("base64")}`;
+
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: "doctors-app",
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    transformation: [{ quality: "auto:good", fetch_format: "auto" }]
   });
 
   res.status(201).json({

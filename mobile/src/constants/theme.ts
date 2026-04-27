@@ -13,6 +13,7 @@ export const theme = {
 
     // Surfaces
     background: "#F1F5F9",
+    backgroundAlt: "#F8FAFC",
     surface: "#FFFFFF",
     surfaceElevated: "#FFFFFF",
     cardBorder: "#E2E8F0",

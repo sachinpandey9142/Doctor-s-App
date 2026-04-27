@@ -24,7 +24,8 @@ const updateUser = catchAsync(async (req, res) => {
     "specialization",
     "hospital",
     "experience",
-    "profileImage"
+    "profileImage",
+    "coverImage"
   ];
 
   const updates = {};

@@ -4,7 +4,8 @@ import {
   createConversationRequest,
   getConversationsRequest,
   getMessagesRequest,
-  sendMessageRequest
+  sendMessageRequest,
+  joinCaseChatRequest
 } from "@/services/api/chatApi";
 import { useToastStore, extractErrorMessage } from "@/store/toastStore";
 import type { ReceiveMessagePayload } from "@/services/socket/socketClient";
@@ -26,6 +27,7 @@ interface ChatState {
   loadingMessages: boolean;
   fetchConversations: () => Promise<void>;
   openOrCreateConversation: (participantId: string) => Promise<Conversation>;
+  joinCaseDiscussion: (postId: string) => Promise<Conversation>;
   fetchMessages: (conversationId: string) => Promise<void>;
   loadOlderMessages: (conversationId: string) => Promise<void>;
   sendMessage: (conversationId: string, text?: string, mediaUrl?: string) => Promise<void>;
@@ -67,6 +69,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   openOrCreateConversation: async (participantId) => {
     const conversation = await createConversationRequest(participantId);
+
+    set((state) => {
+      const exists = state.conversations.find((item) => item._id === conversation._id);
+      const merged = exists
+        ? state.conversations.map((item) => (item._id === conversation._id ? conversation : item))
+        : [conversation, ...state.conversations];
+
+      return { conversations: sortConversations(merged) };
+    });
+
+    return conversation;
+  },
+  
+  joinCaseDiscussion: async (postId) => {
+    const conversation = await joinCaseChatRequest(postId);
 
     set((state) => {
       const exists = state.conversations.find((item) => item._id === conversation._id);

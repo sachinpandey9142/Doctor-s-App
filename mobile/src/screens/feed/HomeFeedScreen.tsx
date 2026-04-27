@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated as RNAnimated,
   FlatList,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View
@@ -23,32 +24,30 @@ import { PostCard } from "@/components/feed/PostCard";
 import type { RootStackParamList } from "@/navigation/types";
 import { useAuthStore } from "@/store/authStore";
 import { useFeedStore } from "@/store/feedStore";
+import { useChatStore } from "@/store/chatStore";
 import { hapticTap } from "@/utils/haptics";
 import type { Post } from "@/types/models";
 
-// ── Skeleton card that exactly mirrors PostCard's structure ───────────────────
-function SkeletonCard({ colors }: { colors: { surface: string; cardBorder: string; borderLight: string } }) {
+type FilterType = "All" | "Cases" | "Media" | "Text";
+const FILTERS: FilterType[] = ["All", "Cases", "Media", "Text"];
+
+function SkeletonCard({ colors }: { colors: { surface: string } }) {
   return (
-    <View style={[styles.skeletonCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-      <View style={styles.skeletonHeader}>
-        <LoadingSkeleton width={42} height={42} borderRadius={21} />
-        <View style={styles.skeletonMeta}>
-          <LoadingSkeleton width={130} height={13} />
-          <View style={{ height: 6 }} />
-          <LoadingSkeleton width={88} height={11} />
+    <View style={[skeletonStyles.card, { backgroundColor: colors.surface }]}>
+      <View style={skeletonStyles.header}>
+        <LoadingSkeleton width={46} height={46} borderRadius={23} />
+        <View style={skeletonStyles.meta}>
+          <LoadingSkeleton width={150} height={13} />
+          <View style={{ height: 7 }} />
+          <LoadingSkeleton width={100} height={11} />
         </View>
       </View>
+      <View style={{ height: 12 }} />
+      <LoadingSkeleton width="92%" height={13} />
+      <View style={{ height: 7 }} />
+      <LoadingSkeleton width="76%" height={13} />
       <View style={{ height: 14 }} />
-      <LoadingSkeleton width="100%" height={12} />
-      <View style={{ height: 8 }} />
-      <LoadingSkeleton width="88%" height={12} />
-      <View style={{ height: 8 }} />
-      <LoadingSkeleton width="70%" height={12} />
-      <View style={[styles.skeletonActions, { borderTopColor: colors.borderLight }]}>
-        <LoadingSkeleton width={52} height={11} />
-        <LoadingSkeleton width={60} height={11} />
-        <LoadingSkeleton width={44} height={11} />
-      </View>
+      <LoadingSkeleton width="100%" height={240} borderRadius={14} />
     </View>
   );
 }
@@ -59,137 +58,194 @@ export function HomeFeedScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const user = useAuthStore((state) => state.user);
-  const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike } =
+  const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike, deletePost } =
     useFeedStore((state) => state);
+  const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
 
-  // ── Skeleton fade-out: when loading finishes the skeleton fades smoothly ──
+  const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const skeletonOpacity = useRef(new RNAnimated.Value(1)).current;
   const prevLoadingRef = useRef(loading);
+  const headerScrollY = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    // Trigger fade-out when loading goes from true → false
     if (prevLoadingRef.current && !loading) {
-      RNAnimated.timing(skeletonOpacity, {
-        toValue: 0,
-        duration: 280,
-        useNativeDriver: true
-      }).start();
+      RNAnimated.timing(skeletonOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     }
     prevLoadingRef.current = loading;
   }, [loading, skeletonOpacity]);
 
-  useEffect(() => {
-    fetchInitialFeed();
-  }, [fetchInitialFeed]);
+  useEffect(() => { fetchInitialFeed(); }, [fetchInitialFeed]);
 
-  const openComments = useCallback(
-    (post: Post) => {
-      navigation.navigate("Comments", {
-        postId: post._id,
-        title: post.isAnonymous && post.type === "case" ? "Anonymous Case" : post.userId.name
+  const filteredPosts = useMemo(() => {
+    if (activeFilter === "All") return posts;
+    if (activeFilter === "Cases") return posts.filter((p) => p.type === "case");
+    if (activeFilter === "Media") return posts.filter((p) => p.type === "image" || p.type === "video" || !!p.mediaUrl);
+    return posts.filter((p) => p.type === "text");
+  }, [posts, activeFilter]);
+
+  const openComments = useCallback((post: Post) => {
+    navigation.navigate("Comments", {
+      postId: post._id,
+      title: post.isAnonymous && post.type === "case" ? "Anonymous Case" : post.userId.name
+    });
+  }, [navigation]);
+
+  const openProfile = useCallback((post: Post) => {
+    const targetId = !post.userId?._id || post.userId._id === user?._id ? user?._id : post.userId._id;
+    navigation.navigate("UserProfile", { userId: targetId || post.userId._id });
+  }, [navigation, user?._id]);
+
+  const handleJoinDiscussion = useCallback(async (post: Post) => {
+    try {
+      const conv = await joinCaseDiscussion(post._id);
+      navigation.navigate("CaseDiscussionThread", {
+        conversationId: conv._id,
+        title: conv.title || "Case Discussion",
+        caseAuthor: post.isAnonymous ? "Anonymous" : post.userId.name,
+        caseSnippet: post.content
       });
-    },
-    [navigation]
-  );
+    } catch (e) {}
+  }, [joinCaseDiscussion, navigation]);
 
-  const openProfile = useCallback(
-    (post: Post) => {
-      const targetId =
-        !post.userId?._id || post.userId._id === user?._id ? user?._id : post.userId._id;
-      navigation.navigate("UserProfile", { userId: targetId || post.userId._id });
-    },
-    [navigation, user?._id]
-  );
+  const handleViewCase = useCallback((post: Post) => {
+    navigation.navigate("CaseDetail", { post });
+  }, [navigation]);
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: Post; index: number }) => (
-      <Animated.View entering={FadeInDown.delay(Math.min(index * 35, 210)).duration(280).springify()}>
-        <PostCard
-          post={item}
-          currentUserId={user?._id}
-          onLike={toggleLike}
-          onComment={openComments}
-          onAuthorPress={openProfile}
-        />
-      </Animated.View>
-    ),
-    [openComments, openProfile, toggleLike, user?._id]
-  );
+  const renderItem = useCallback(({ item, index }: { item: Post; index: number }) => (
+    <Animated.View entering={FadeInDown.delay(Math.min(index * 40, 200)).duration(280).springify()}>
+      <PostCard
+        post={item}
+        currentUserId={user?._id}
+        onLike={toggleLike}
+        onComment={openComments}
+        onAuthorPress={openProfile}
+        onDelete={deletePost}
+        onJoinDiscussion={handleJoinDiscussion}
+        onViewCase={handleViewCase}
+        isAdmin={user?.role === "admin"}
+      />
+    </Animated.View>
+  ), [deletePost, handleJoinDiscussion, handleViewCase, openComments, openProfile, toggleLike, user?._id, user?.role]);
 
-  const skeletonColors = useMemo(
-    () => ({
-      surface: theme.colors.surface,
-      cardBorder: theme.colors.cardBorder,
-      borderLight: theme.colors.borderLight
-    }),
-    [theme.colors]
-  );
+  const skeletonColors = useMemo(() => ({ surface: theme.colors.surface }), [theme.colors]);
 
-  // ── Refined branded header ────────────────────────────────────────────────
-  const listHeader = useMemo(
-    () => (
-      <LinearGradient colors={["#EFF6FF", theme.colors.background]} style={styles.feedHeader}>
-        {/* Brand wordmark row */}
-        <View style={styles.brandRow}>
-          <View style={[styles.brandIcon, { backgroundColor: theme.colors.primaryLight }]}>
-            <Activity size={15} color={theme.colors.primary} strokeWidth={2.5} />
-          </View>
-          <Text style={[styles.brandWordmark, { color: theme.colors.primary }]}>DOCTOR'S APP</Text>
-        </View>
-
-        <Text style={[styles.feedTitle, { color: theme.colors.textPrimary }]}>Clinical Feed</Text>
-        <Text style={[styles.feedTagline, { color: theme.colors.textSecondary }]}>
-          Verified medical voices · Case discussions · Latest updates
-        </Text>
-      </LinearGradient>
-    ),
-    [theme.colors]
-  );
-
-  const clusterTop = insets.top + 8;
-  const listTopPad = insets.top + 56;
-
+  // Header white bg fades in as user scrolls
+  const headerBgOpacity = headerScrollY.interpolate({ inputRange: [0, 50], outputRange: [0, 1], extrapolate: "clamp" });
+  const headerBorderOpacity = headerScrollY.interpolate({ inputRange: [20, 60], outputRange: [0, 1], extrapolate: "clamp" });
+  const headerTopPad = insets.top;
+  const listTopPad = headerTopPad + 112;
   const showSkeleton = loading && posts.length === 0;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* ── Fixed action cluster ─────────────────────────────────────── */}
-      <View style={[styles.actionsCluster, { top: clusterTop }]}>
-        <Pressable
-          style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
-          onPress={() => { hapticTap(); navigation.navigate("Discover"); }}
-        >
-          <Search size={17} color={theme.colors.primary} />
-        </Pressable>
-
-        <Pressable
-          style={[styles.headerButton, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.surface }]}
-          onPress={() => { hapticTap(); navigation.navigate("Notifications"); }}
-        >
-          <Bell size={17} color={theme.colors.primary} />
-        </Pressable>
-      </View>
-
-      {/* ── Skeleton (fades out when content loads) ─────────────────── */}
-      {showSkeleton ? (
+      {/* ── Fixed header ──────────────────────────────────────── */}
+      <View style={[styles.headerWrap, { paddingTop: headerTopPad }]}>
+        {/* Animated white bg on scroll */}
         <RNAnimated.View
           style={[
-            styles.skeletonWrap,
-            { paddingTop: listTopPad + 72, opacity: skeletonOpacity }
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: theme.colors.surface, opacity: headerBgOpacity }
           ]}
+        />
+        {/* Animated bottom border on scroll */}
+        <RNAnimated.View
+          style={[
+            styles.headerBorder,
+            { borderBottomColor: theme.colors.border, opacity: headerBorderOpacity }
+          ]}
+        />
+
+        {/* Brand + actions */}
+        <View style={styles.headerInner}>
+          <View style={styles.brandRow}>
+            <LinearGradient
+              colors={["#2563EB", "#06B6D4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.brandIcon}
+            >
+              <Activity size={15} color="#FFFFFF" strokeWidth={2.5} />
+            </LinearGradient>
+            <Text style={[styles.brandName, { color: theme.colors.textPrimary }]}>MediSync</Text>
+          </View>
+
+          <View style={styles.headerActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.headerBtn,
+                { backgroundColor: pressed ? theme.colors.primaryLight : theme.colors.surface, borderColor: theme.colors.border }
+              ]}
+              onPress={() => { hapticTap(); navigation.navigate("Discover"); }}
+            >
+              <Search size={17} color={theme.colors.textPrimary} strokeWidth={2} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.headerBtn,
+                { backgroundColor: pressed ? theme.colors.primaryLight : theme.colors.surface, borderColor: theme.colors.border }
+              ]}
+              onPress={() => { hapticTap(); navigation.navigate("Notifications"); }}
+            >
+              <Bell size={17} color={theme.colors.textPrimary} strokeWidth={2} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Filter chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterList}
         >
-          {[0, 1, 2, 3].map((i) => (
-            <SkeletonCard key={i} colors={skeletonColors} />
-          ))}
+          {FILTERS.map((filter) => {
+            const active = activeFilter === filter;
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => { hapticTap(); setActiveFilter(filter); }}
+                style={[
+                  styles.filterChip,
+                  active
+                    ? styles.filterChipActive
+                    : { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 }
+                ]}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={["#2563EB", "#06B6D4"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.filterChipGrad}
+                  >
+                    <Text style={[styles.filterText, { color: "#FFFFFF" }]}>{filter}</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={[styles.filterText, { color: theme.colors.textSecondary }]}>{filter}</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ── Feed / Skeleton ──────────────────────────────────── */}
+      {showSkeleton ? (
+        <RNAnimated.View style={{ paddingTop: listTopPad, flex: 1, opacity: skeletonOpacity }}>
+          {[0, 1, 2].map((i) => <SkeletonCard key={i} colors={skeletonColors} />)}
         </RNAnimated.View>
       ) : (
         <FlatList
-          data={posts}
+          data={filteredPosts}
           renderItem={renderItem}
           keyExtractor={(item) => item._id}
           contentContainerStyle={[styles.listContent, { paddingTop: listTopPad }]}
           onEndReached={fetchMoreFeed}
           onEndReachedThreshold={0.5}
+          onScroll={RNAnimated.event(
+            [{ nativeEvent: { contentOffset: { y: headerScrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -198,43 +254,40 @@ export function HomeFeedScreen() {
               progressViewOffset={listTopPad}
             />
           }
-          ListHeaderComponent={listHeader}
           ListEmptyComponent={
             <EmptyState
               icon={<Activity size={30} color={theme.colors.primary} />}
-              title="Your feed is empty"
-              body="Follow medical professionals or publish the first post to get started."
+              title="No posts yet"
+              body="Follow medical professionals or publish the first post."
               ctaLabel="Explore Professionals"
               onCta={() => navigation.navigate("Discover")}
-              style={styles.emptyState}
+              style={{ marginTop: 24 }}
             />
           }
           showsVerticalScrollIndicator={false}
-          // ── Buttery smooth scroll ──────────────────────────────────
           decelerationRate="normal"
-          overScrollMode="never"   // Android: removes over-scroll glow
-          bounces                  // iOS: keep natural bounce
+          overScrollMode="never"
+          bounces
           initialNumToRender={5}
           maxToRenderPerBatch={4}
           windowSize={7}
           removeClippedSubviews={Platform.OS === "android"}
-          // Avoid re-render of off-screen items on scroll position changes
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
       )}
 
-      {/* ── FAB ─────────────────────────────────────────────────────── */}
+      {/* ── FAB ─────────────────────────────────────────────── */}
       <Pressable
         onPress={() => { hapticTap(); navigation.navigate("CreatePost"); }}
-        style={[styles.fabWrap, { bottom: insets.bottom + 20 }]}
+        style={({ pressed }) => [styles.fabWrap, { bottom: insets.bottom + 86, opacity: pressed ? 0.9 : 1 }]}
       >
         <LinearGradient
-          colors={theme.gradients.primary}
+          colors={["#2563EB", "#06B6D4"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.fab, theme.shadow.floating]}
+          style={styles.fab}
         >
-          <Plus size={22} color="#FFFFFF" />
+          <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
         </LinearGradient>
       </Pressable>
     </View>
@@ -243,100 +296,120 @@ export function HomeFeedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  actionsCluster: {
+  // Header
+  headerWrap: {
     position: "absolute",
-    right: 16,
-    flexDirection: "row",
-    gap: 8,
-    zIndex: 20
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2
+    shadowRadius: 8,
+    elevation: 4
   },
-  // ── Branded header
-  feedHeader: {
-    paddingBottom: 16,
-    paddingTop: 4
+  headerBorder: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth
   },
-  brandRow: {
+  headerInner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 10
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 11
   },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   brandIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center"
   },
-  brandWordmark: {
+  brandName: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 11,
-    letterSpacing: 1.8
+    fontSize: 20,
+    letterSpacing: -0.4
   },
-  feedTitle: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 28
-  },
-  feedTagline: {
-    marginTop: 5,
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13,
-    lineHeight: 20
-  },
-  // ── List
-  listContent: {
-    paddingHorizontal: 14,
-    paddingBottom: 110
-  },
-  emptyState: { marginTop: 16 },
-  // ── Skeleton
-  skeletonWrap: {
-    paddingHorizontal: 14,
-    gap: 10
-  },
-  skeletonCard: {
+  headerActions: { flexDirection: "row", gap: 8 },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 14,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2
-  },
-  skeletonHeader: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 10
+    justifyContent: "center",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1
   },
-  skeletonMeta: { flex: 1 },
-  skeletonActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    borderTopWidth: 1,
-    marginTop: 14,
-    paddingTop: 10
+  // Filter chips
+  filterList: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    gap: 7,
+    flexDirection: "row"
   },
-  // ── FAB
+  filterChip: {
+    borderRadius: 999,
+    overflow: "hidden"
+  },
+  filterChipActive: {
+    borderRadius: 999,
+    overflow: "hidden"
+  },
+  filterChipGrad: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 999
+  },
+  filterText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 7
+  },
+  // Feed
+  listContent: { paddingBottom: 120 },
+  // FAB
   fabWrap: { position: "absolute", right: 16 },
   fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 19,
+    width: 54,
+    height: 54,
+    borderRadius: 17,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 18,
+    elevation: 12
   }
+});
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    marginHorizontal: 14,
+    marginBottom: 14,
+    borderRadius: 18,
+    paddingTop: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden"
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    marginBottom: 6
+  },
+  meta: { flex: 1 }
 });

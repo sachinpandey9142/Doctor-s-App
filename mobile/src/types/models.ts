@@ -1,4 +1,5 @@
 export type MedicalRole =
+  | "admin"
   | "doctor"
   | "nurse"
   | "lab-technician"
@@ -15,8 +16,11 @@ export interface User {
   hospital: string;
   experience: number;
   isVerified: boolean;
+  isBlocked: boolean;
+  idDocument: string;
   reputationScore: number;
   profileImage: string;
+  coverImage?: string;
   followers: string[];
   following: string[];
   createdAt: string;
@@ -62,6 +66,9 @@ export interface Conversation {
   participants: User[];
   lastMessage: string;
   updatedAt: string;
+  isGroup?: boolean;
+  title?: string;
+  postId?: string;
 }
 
 export interface Message {

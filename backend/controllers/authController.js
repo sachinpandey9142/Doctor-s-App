@@ -19,7 +19,8 @@ const register = catchAsync(async (req, res) => {
     specialization = "",
     hospital = "",
     experience = 0,
-    profileImage = ""
+    profileImage = "",
+    idDocument = ""
   } = req.body;
 
   const normalizedEmail = String(email).toLowerCase().trim();
@@ -39,7 +40,8 @@ const register = catchAsync(async (req, res) => {
     specialization: String(specialization || "").trim(),
     hospital: String(hospital || "").trim(),
     experience: Number(experience) || 0,
-    profileImage: String(profileImage || "").trim()
+    profileImage: String(profileImage || "").trim(),
+    idDocument: String(idDocument || "").trim()
   });
 
   const token = signToken(user);

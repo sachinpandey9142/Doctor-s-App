@@ -11,7 +11,7 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB hard limit (also enforced in controller)
+    fileSize: 15 * 1024 * 1024, // 15 MB — React Native sends full-res photos
     files: 1
   }
 });

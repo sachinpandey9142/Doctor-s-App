@@ -9,14 +9,16 @@ import {
   View
 } from "react-native";
 import { ChevronDown, ChevronUp, Stethoscope } from "lucide-react-native";
+import { Image } from "expo-image";
 import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFeedStore } from "@/store/feedStore";
+import { useChatStore } from "@/store/chatStore";
+import { useNavigation } from "@react-navigation/native";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 
 import { Avatar } from "@/components/common/Avatar";
 import { EmptyState } from "@/components/common/EmptyState";
-import { GlassCard } from "@/components/common/GlassCard";
-import { useFeedStore } from "@/store/feedStore";
 import { hapticTap } from "@/utils/haptics";
 import { formatRelativeTime } from "@/utils/date";
 import type { Post } from "@/types/models";
@@ -24,26 +26,39 @@ import type { Post } from "@/types/models";
 export function CaseDiscussionScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { casePosts, fetchCaseFeed } = useFeedStore((state) => state);
+  const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchCaseFeed();
-  }, [fetchCaseFeed]);
+  useEffect(() => { fetchCaseFeed(); }, [fetchCaseFeed]);
 
   const refreshCases = async () => {
     setRefreshing(true);
-    try {
-      await fetchCaseFeed();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await fetchCaseFeed(); }
+    finally { setRefreshing(false); }
   };
 
   const toggleExpand = (postId: string) => {
     hapticTap();
-    setExpandedMap((state) => ({ ...state, [postId]: !state[postId] }));
+    setExpandedMap((s) => ({ ...s, [postId]: !s[postId] }));
+  };
+
+  const handleJoinChat = async (post: Post) => {
+    try {
+      const conv = await joinCaseDiscussion(post._id);
+      navigation.navigate("CaseDiscussionThread", {
+        conversationId: conv._id,
+        title: conv.title || "Case Discussion",
+        caseAuthor: post.isAnonymous ? "Anonymous" : post.userId.name,
+        caseSnippet: post.content
+      });
+    } catch (e) {}
+  };
+
+  const handleViewCase = (post: Post) => {
+    navigation.navigate("CaseDetail", { post });
   };
 
   const renderItem = useCallback(
@@ -53,64 +68,81 @@ export function CaseDiscussionScreen() {
       return (
         <Animated.View entering={FadeInDown.delay(Math.min(index * 35, 180)).duration(260).springify()}>
           <Pressable onPress={() => toggleExpand(item._id)}>
-            <GlassCard style={styles.caseCard} padded={false}>
-              {/* ── Header ─────────────────────────────────────────── */}
-              <View style={styles.caseHeader}>
-                <View style={styles.caseProfileRow}>
-                  <Avatar
-                    name={item.isAnonymous ? "Anonymous Case" : item.userId.name}
-                    uri={item.isAnonymous ? "" : item.userId.profileImage}
-                    verified={item.userId.isVerified}
-                    size={40}
-                  />
-                  <View style={styles.authorText}>
-                    <Text style={[styles.name, { color: theme.colors.textPrimary }]}>
-                      {item.isAnonymous ? "Anonymous Case" : item.userId.name}
-                    </Text>
-                    <Text style={[styles.meta, { color: theme.colors.textTertiary }]}>
-                      {formatRelativeTime(item.createdAt)}
-                    </Text>
-                  </View>
+            <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              {/* Header */}
+              <View style={styles.cardHeader}>
+                <Avatar
+                  name={item.isAnonymous ? "Anonymous Case" : item.userId.name}
+                  uri={item.isAnonymous ? "" : item.userId.profileImage}
+                  verified={item.userId.isVerified}
+                  size={40}
+                />
+                <View style={styles.authorText}>
+                  <Text style={[styles.name, { color: theme.colors.textPrimary }]}>
+                    {item.isAnonymous ? "Anonymous Case" : item.userId.name}
+                  </Text>
+                  <Text style={[styles.meta, { color: theme.colors.textTertiary }]}>
+                    {formatRelativeTime(item.createdAt)}
+                  </Text>
                 </View>
-
-                {/* Expand/collapse chevron */}
                 <View style={[styles.chevronWrap, { backgroundColor: theme.colors.primaryLight }]}>
                   {expanded
-                    ? <ChevronUp size={15} color={theme.colors.primary} />
-                    : <ChevronDown size={15} color={theme.colors.primary} />}
+                    ? <ChevronUp size={14} color={theme.colors.primary} />
+                    : <ChevronDown size={14} color={theme.colors.primary} />}
                 </View>
               </View>
 
-              {/* ── Content ────────────────────────────────────────── */}
-              <View style={styles.contentWrap}>
-                <Text style={[styles.content, { color: theme.colors.textPrimary }]} numberOfLines={expanded ? undefined : 3}>
-                  {item.content}
-                </Text>
-              </View>
+              {/* Content */}
+              <Text style={[styles.content, { color: theme.colors.textPrimary }]} numberOfLines={expanded ? undefined : 3}>
+                {item.content}
+              </Text>
 
-              {/* ── Expanded details ───────────────────────────────── */}
+              {/* Expanded details */}
               {expanded ? (
-                <Animated.View
-                  entering={FadeIn.duration(200)}
-                  style={[styles.expandedWrap, { backgroundColor: theme.colors.badgeCaseLight, borderColor: "#C4B5FD" }]}
-                >
-                  <View style={styles.expandedTitleRow}>
-                    <Stethoscope size={13} color={theme.colors.badgeCase} />
-                    <Text style={[styles.expandedLabel, { color: theme.colors.badgeCase }]}>Clinical Details</Text>
+                <Animated.View entering={FadeIn.duration(180)} style={styles.expandedWrap}>
+                  <View style={styles.expandTitleRow}>
+                    <Stethoscope size={12} color="#7C3AED" />
+                    <Text style={styles.expandLabel}>CLINICAL DETAILS</Text>
                   </View>
 
-                  <Text style={[styles.sectionKey, { color: theme.colors.textTertiary }]}>SYMPTOMS</Text>
+                  <Text style={styles.sectionKey}>SYMPTOMS</Text>
                   <Text style={[styles.sectionBody, { color: theme.colors.textPrimary }]}>
                     {item.symptoms || "No symptoms recorded."}
                   </Text>
 
-                  <Text style={[styles.sectionKey, { color: theme.colors.textTertiary, marginTop: 10 }]}>OBSERVATIONS</Text>
+                  <Text style={[styles.sectionKey, { marginTop: 10 }]}>OBSERVATIONS</Text>
                   <Text style={[styles.sectionBody, { color: theme.colors.textPrimary }]}>
                     {item.observations || "No observations recorded."}
                   </Text>
+
+                  {(item.mediaUrl || (item.reportImages && item.reportImages.length > 0)) ? (
+                    <View style={styles.imageWrap}>
+                      <Image
+                        source={{ uri: item.mediaUrl || item.reportImages?.[0] }}
+                        style={styles.caseImage}
+                        contentFit="cover"
+                        transition={300}
+                      />
+                    </View>
+                  ) : null}
+
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      style={styles.outlineBtn}
+                      onPress={() => handleViewCase(item)}
+                    >
+                      <Text style={styles.outlineBtnText}>View Details</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.discussBtn, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => handleJoinChat(item)}
+                    >
+                      <Text style={styles.discussBtnText}>Discuss Case</Text>
+                    </Pressable>
+                  </View>
                 </Animated.View>
               ) : null}
-            </GlassCard>
+            </View>
           </Pressable>
         </Animated.View>
       );
@@ -126,20 +158,14 @@ export function CaseDiscussionScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 16 }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshCases}
-            tintColor={theme.colors.primary}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshCases} tintColor={theme.colors.primary} />}
         ListHeaderComponent={
           <View style={styles.headerWrap}>
             <View style={styles.headerBrandRow}>
-              <View style={[styles.headerIcon, { backgroundColor: theme.colors.badgeCaseLight }]}>
-                <Stethoscope size={16} color={theme.colors.badgeCase} />
+              <View style={[styles.headerIcon, { backgroundColor: "#F5F3FF" }]}>
+                <Stethoscope size={15} color="#7C3AED" />
               </View>
-              <Text style={[styles.headerBrand, { color: theme.colors.badgeCase }]}>CASE DISCUSSIONS</Text>
+              <Text style={styles.headerBrand}>CASE DISCUSSIONS</Text>
             </View>
             <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Clinical Cases</Text>
             <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
@@ -149,10 +175,9 @@ export function CaseDiscussionScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon={<Stethoscope size={30} color={theme.colors.badgeCase} />}
+            icon={<Stethoscope size={28} color="#7C3AED" />}
             title="No cases yet"
             body="Post a medical case anonymously or publicly to start a clinical discussion."
-            accentColor={theme.colors.badgeCaseLight}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -169,60 +194,95 @@ export function CaseDiscussionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: {
-    paddingHorizontal: 14,
-    paddingBottom: 120
+  listContent: { paddingHorizontal: 14, paddingBottom: 120, gap: 10 },
+  // Header
+  headerWrap: { marginBottom: 8 },
+  headerBrandRow: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 8 },
+  headerIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  headerBrand: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 10, letterSpacing: 1.5, color: "#7C3AED" },
+  headerTitle: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 24 },
+  headerSubtitle: { marginTop: 4, fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 },
+  // Card
+  card: {
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
   },
-  // ── Header
-  headerWrap: { marginBottom: 14 },
-  headerBrandRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
-  headerIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  headerBrand: {
-    fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 11,
-    letterSpacing: 1.8
-  },
-  headerTitle: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 26 },
-  headerSubtitle: { marginTop: 5, fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 },
-  // ── Card
-  caseCard: { marginBottom: 10 },
-  caseHeader: {
+  cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
     padding: 14,
-    paddingBottom: 0
+    paddingBottom: 10
   },
-  caseProfileRow: { flexDirection: "row", gap: 10, alignItems: "center", flex: 1 },
   authorText: { flex: 1 },
-  name: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 15 },
+  name: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 14 },
   meta: { fontFamily: "Manrope_500Medium", fontSize: 12, marginTop: 2 },
   chevronWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0
   },
-  contentWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14 },
-  content: { fontFamily: "Manrope_500Medium", fontSize: 14, lineHeight: 22 },
-  // ── Expanded details
+  content: {
+    fontFamily: "Manrope_500Medium",
+    fontSize: 14,
+    lineHeight: 22,
+    paddingHorizontal: 14,
+    paddingBottom: 14
+  },
+  // Expanded
   expandedWrap: {
     marginHorizontal: 14,
     marginBottom: 14,
+    backgroundColor: "rgba(109,40,217,0.05)",
     borderWidth: 1,
-    borderRadius: 14,
+    borderColor: "#DDD6FE",
+    borderRadius: 12,
     padding: 12
   },
-  expandedTitleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
-  expandedLabel: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 12 },
-  sectionKey: { fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 0.6 },
-  sectionBody: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }
+  expandTitleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
+  expandLabel: { fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 0.8, color: "#7C3AED" },
+  sectionKey: { fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 0.5, color: "#94A3B8" },
+  sectionBody: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 },
+  imageWrap: { marginTop: 12, borderRadius: 10, overflow: "hidden", height: 180 },
+  caseImage: { width: "100%", height: "100%" },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 14
+  },
+  outlineBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  outlineBtnText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 13,
+    color: "#7C3AED"
+  },
+  discussBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  discussBtnText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 13,
+    color: "#FFFFFF"
+  }
 });

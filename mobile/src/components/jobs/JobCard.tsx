@@ -1,9 +1,8 @@
 import React, { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Briefcase, MapPin, Users } from "lucide-react-native";
+import { Briefcase, MapPin, Users, DollarSign } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
 
-import { GlassCard } from "@/components/common/GlassCard";
 import { AnimatedButton } from "@/components/common/AnimatedButton";
 import type { Job } from "@/types/models";
 
@@ -17,70 +16,59 @@ function JobCardBase({ job, onApply }: JobCardProps) {
   const applicantCount = job.applicants?.length ?? 0;
 
   return (
-    <GlassCard style={styles.container} padded={false}>
-      {/* ── Header: title + salary badge ───────────────────────────── */}
+    <View style={[styles.container, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      {/* ── Header ───────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {/* Hospital icon chip */}
-          <View style={[styles.hospitalIcon, { backgroundColor: theme.colors.primaryLight }]}>
-            <Briefcase size={18} color={theme.colors.primary} />
-          </View>
-
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-              {job.title}
-            </Text>
-            <Text style={[styles.hospital, { color: theme.colors.primary }]} numberOfLines={1}>
-              {job.hospital}
-            </Text>
-          </View>
+        <View style={[styles.iconWrap, { backgroundColor: theme.colors.primaryLight }]}>
+          <Briefcase size={20} color={theme.colors.primary} strokeWidth={1.8} />
         </View>
-
-        {/* Salary badge */}
+        <View style={styles.headerText}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+            {job.title}
+          </Text>
+          <Text style={[styles.hospital, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+            {job.hospital}
+          </Text>
+        </View>
         {job.salary ? (
-          <View style={[styles.salaryBadge, { backgroundColor: theme.colors.successLight }]}>
-            <Text style={[styles.salaryText, { color: theme.colors.success }]}>
-              {job.salary}
-            </Text>
+          <View style={[styles.salaryBadge, { backgroundColor: "#CCFBF1" }]}>
+            <DollarSign size={10} color="#0D9488" strokeWidth={2.5} />
+            <Text style={[styles.salaryText, { color: "#0D9488" }]}>{job.salary}</Text>
           </View>
         ) : null}
       </View>
 
-      {/* ── Meta row: location + applicants ────────────────────────── */}
+      {/* ── Description ──────────────────────────────────── */}
+      <Text numberOfLines={3} style={[styles.description, { color: theme.colors.textSecondary }]}>
+        {job.description}
+      </Text>
+
+      {/* ── Meta row ─────────────────────────────────────── */}
       <View style={[styles.metaRow, { borderTopColor: theme.colors.borderLight }]}>
         <View style={styles.metaItem}>
-          <MapPin size={13} color={theme.colors.textTertiary} />
+          <MapPin size={12} color={theme.colors.textTertiary} strokeWidth={1.8} />
           <Text style={[styles.metaText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
             {job.location}
           </Text>
         </View>
-
-        <View style={[styles.metaDivider, { backgroundColor: theme.colors.borderLight }]} />
-
+        <View style={[styles.metaDot, { backgroundColor: theme.colors.borderLight }]} />
         <View style={styles.metaItem}>
-          <Users size={13} color={theme.colors.textTertiary} />
+          <Users size={12} color={theme.colors.textTertiary} strokeWidth={1.8} />
           <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>
             {applicantCount} {applicantCount === 1 ? "applicant" : "applicants"}
           </Text>
         </View>
       </View>
 
-      {/* ── Description ────────────────────────────────────────────── */}
-      <View style={styles.descriptionWrap}>
-        <Text numberOfLines={3} style={[styles.description, { color: theme.colors.textSecondary }]}>
-          {job.description}
-        </Text>
-      </View>
-
-      {/* ── Apply button ────────────────────────────────────────────── */}
+      {/* ── Apply ────────────────────────────────────────── */}
       <View style={styles.footer}>
         <AnimatedButton
-          title={applicantCount > 0 && job.applicants?.includes("self") ? "Applied ✓" : "Apply Now"}
+          title="Apply Now"
           onPress={() => onApply(job._id)}
-          style={styles.applyButton}
+          style={styles.applyBtn}
         />
       </View>
-    </GlassCard>
+    </View>
   );
 }
 
@@ -88,34 +76,32 @@ export const JobCard = memo(JobCardBase);
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 14
+    borderWidth: 1,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
   },
-  // ── Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 16,
-    paddingBottom: 12
-  },
-  headerLeft: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    flex: 1
+    padding: 16,
+    paddingBottom: 10
   },
-  hospitalIcon: {
+  iconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0
   },
-  headerText: {
-    flex: 1
-  },
+  headerText: { flex: 1 },
   title: {
     fontFamily: "SpaceGrotesk_700Bold",
     fontSize: 16,
@@ -123,59 +109,40 @@ const styles = StyleSheet.create({
   },
   hospital: {
     marginTop: 3,
-    fontFamily: "Manrope_700Bold",
+    fontFamily: "Manrope_500Medium",
     fontSize: 13
   },
   salaryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexShrink: 0
   },
   salaryText: {
     fontFamily: "Manrope_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.2
+    fontSize: 11
   },
-  // ── Meta row
+  description: {
+    fontFamily: "Manrope_500Medium",
+    fontSize: 14,
+    lineHeight: 21,
+    paddingHorizontal: 16,
+    paddingBottom: 10
+  },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     borderTopWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 10
+    paddingVertical: 10,
+    gap: 8
   },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    flex: 1
-  },
-  metaDivider: {
-    width: 1,
-    height: 14,
-    marginHorizontal: 10
-  },
-  metaText: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 12
-  },
-  // ── Description
-  descriptionWrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 4
-  },
-  description: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 14,
-    lineHeight: 21
-  },
-  // ── Footer
-  footer: {
-    padding: 16,
-    paddingTop: 12
-  },
-  applyButton: {
-    // Full width inside the card footer
-  }
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 4, flex: 1 },
+  metaDot: { width: 4, height: 4, borderRadius: 2 },
+  metaText: { fontFamily: "Manrope_500Medium", fontSize: 12 },
+  footer: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 },
+  applyBtn: {}
 });
