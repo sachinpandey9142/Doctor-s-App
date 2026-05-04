@@ -12,7 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { UserPlus, ImagePlus, CheckCircle } from "lucide-react-native";
+import { Building2, CheckCircle, ImagePlus, Lock, Mail, Stethoscope, User, UserPlus } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { uploadImageRequest } from "@/services/api/uploadApi";
@@ -152,7 +152,12 @@ export function SignupScreen() {
           <GlassCard>
             <Text style={[styles.formTitle, { color: theme.colors.textPrimary }]}>Basic Details</Text>
 
-            <FloatingInput label="Full Name" value={name} onChangeText={setName} />
+            <FloatingInput 
+              label="Full Name" 
+              value={name} 
+              onChangeText={setName} 
+              leftIcon={<User size={20} color={theme.colors.textSecondary} />}
+            />
             <FloatingInput
               label="Email address"
               value={email}
@@ -160,6 +165,7 @@ export function SignupScreen() {
               autoCapitalize="none"
               onChangeText={setEmail}
               containerStyle={styles.inputGap}
+              leftIcon={<Mail size={20} color={theme.colors.textSecondary} />}
             />
             <FloatingInput
               label="Password"
@@ -167,18 +173,21 @@ export function SignupScreen() {
               secureTextEntry
               onChangeText={setPassword}
               containerStyle={styles.inputGap}
+              leftIcon={<Lock size={20} color={theme.colors.textSecondary} />}
             />
             <FloatingInput
               label="Specialization"
               value={specialization}
               onChangeText={setSpecialization}
               containerStyle={styles.inputGap}
+              leftIcon={<Stethoscope size={20} color={theme.colors.textSecondary} />}
             />
             <FloatingInput
               label="Hospital / Institution"
               value={hospital}
               onChangeText={setHospital}
               containerStyle={styles.inputGap}
+              leftIcon={<Building2 size={20} color={theme.colors.textSecondary} />}
             />
 
             {/* Role selector */}

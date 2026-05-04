@@ -41,6 +41,27 @@ export interface Post {
   createdAt: string;
 }
 
+export interface Story {
+  _id: string;
+  userId: User;
+  mediaUrl: string;
+  type: "image" | "video";
+  caption?: string;
+  visibility: "followers" | "public";
+  viewers: string[];
+  expiresAt: string;
+  createdAt: string;
+  isSeen?: boolean;
+  viewerCount?: number;
+}
+
+export interface StoryGroup {
+  user: User;
+  stories: Story[];
+  latestStoryAt: string;
+  hasUnseen: boolean;
+}
+
 export interface Comment {
   _id: string;
   postId: string;

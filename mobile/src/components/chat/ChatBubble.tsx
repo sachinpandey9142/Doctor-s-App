@@ -1,9 +1,10 @@
 import React, { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import Animated, { FadeInDown, FadeInLeft, FadeInRight } from "react-native-reanimated";
+import Animated, { FadeInLeft, FadeInRight } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
+import { CheckCheck } from "lucide-react-native";
 
 import type { Message } from "@/types/models";
 import { formatRelativeTime } from "@/utils/date";
@@ -16,16 +17,17 @@ interface ChatBubbleProps {
 function ChatBubbleBase({ message, isMine }: ChatBubbleProps) {
   const theme = useTheme();
   const senderName = message.senderId?.name ?? "Someone";
+  const timeStr = formatRelativeTime(message.createdAt);
 
   if (!isMine) {
     return (
       <Animated.View
         entering={FadeInLeft.duration(200).springify().damping(18)}
-        style={[styles.row, { justifyContent: "flex-start" }]}
+        style={styles.rowReceived}
       >
         <View style={styles.receivedWrap}>
           <Text style={[styles.senderName, { color: theme.colors.primary }]}>{senderName}</Text>
-          <View style={[styles.bubble, styles.receivedBubble]}>
+          <View style={[styles.bubble, styles.receivedBubble, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             {message.mediaUrl ? (
               <Image
                 source={{ uri: message.mediaUrl }}
@@ -40,7 +42,7 @@ function ChatBubbleBase({ message, isMine }: ChatBubbleProps) {
               </Text>
             ) : null}
             <Text style={[styles.timestamp, { color: theme.colors.textTertiary }]}>
-              {formatRelativeTime(message.createdAt)}
+              {timeStr}
             </Text>
           </View>
         </View>
@@ -51,10 +53,9 @@ function ChatBubbleBase({ message, isMine }: ChatBubbleProps) {
   return (
     <Animated.View
       entering={FadeInRight.duration(200).springify().damping(18)}
-      style={[styles.row, { justifyContent: "flex-end" }]}
+      style={styles.rowSent}
     >
       <View style={styles.sentWrap}>
-        {/* Brand-identity gradient: blue → teal */}
         <LinearGradient
           colors={["#2563EB", "#06B6D4"]}
           start={{ x: 0, y: 0 }}
@@ -74,9 +75,10 @@ function ChatBubbleBase({ message, isMine }: ChatBubbleProps) {
               {message.text}
             </Text>
           ) : null}
-          <Text style={styles.sentTimestamp}>
-            {formatRelativeTime(message.createdAt)}
-          </Text>
+          <View style={styles.sentMeta}>
+            <Text style={styles.sentTimestamp}>{timeStr}</Text>
+            <CheckCheck size={12} color="rgba(255,255,255,0.75)" strokeWidth={2.5} />
+          </View>
         </LinearGradient>
       </View>
     </Animated.View>
@@ -86,11 +88,17 @@ function ChatBubbleBase({ message, isMine }: ChatBubbleProps) {
 export const ChatBubble = memo(ChatBubbleBase);
 
 const styles = StyleSheet.create({
-  row: {
+  rowReceived: {
     flexDirection: "row",
-    // More breathing room between messages — makes chat feel human, not cramped
-    marginBottom: 12,
-    paddingHorizontal: 8
+    justifyContent: "flex-start",
+    marginBottom: 10,
+    paddingHorizontal: 10
+  },
+  rowSent: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 10,
+    paddingHorizontal: 10
   },
   receivedWrap: {
     maxWidth: "78%",
@@ -99,21 +107,17 @@ const styles = StyleSheet.create({
   },
   senderName: {
     fontFamily: "Manrope_700Bold",
-    fontSize: 11.5,
-    marginLeft: 16,
+    fontSize: 11,
+    marginLeft: 14,
     letterSpacing: 0.1
   },
   receivedBubble: {
-    // Clean, slightly warm white surface — distinct from background
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E8EDF3",
-    borderTopLeftRadius: 5,
-    // Subtle shadow so received bubbles "float" off background
+    borderTopLeftRadius: 4,
     shadowColor: "#94A3B8",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     elevation: 2
   },
   sentWrap: {
@@ -121,42 +125,47 @@ const styles = StyleSheet.create({
     alignItems: "flex-end"
   },
   sentBubble: {
-    borderBottomRightRadius: 5,
-    // Stronger shadow using brand color for sent — makes it pop
+    borderBottomRightRadius: 4,
     shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 4
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 5
   },
   bubble: {
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-    gap: 3
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 4
   },
   messageText: {
     fontFamily: "Manrope_500Medium",
     fontSize: 15,
-    lineHeight: 22
+    lineHeight: 23
   },
   mediaImage: {
     width: 210,
     height: 155,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 4
   },
   timestamp: {
-    marginTop: 3,
     fontFamily: "Manrope_500Medium",
     fontSize: 10,
-    textAlign: "left"
+    textAlign: "left",
+    marginTop: 2
+  },
+  sentMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: 3
   },
   sentTimestamp: {
-    marginTop: 3,
     fontFamily: "Manrope_500Medium",
     fontSize: 10,
-    color: "rgba(255,255,255,0.62)",
-    textAlign: "right"
+    color: "rgba(255,255,255,0.65)"
   }
 });

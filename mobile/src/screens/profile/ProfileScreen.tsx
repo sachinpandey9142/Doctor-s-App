@@ -18,10 +18,11 @@ import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Grid2x2, List, MapPin, Briefcase, Star, Camera, ImagePlus, ChevronLeft, Image as ImageIcon, Stethoscope, MessageSquare, Info } from "lucide-react-native";
+import { Grid2x2, List, MapPin, Briefcase, Star, Camera, ImagePlus, ChevronLeft, Image as ImageIcon, Stethoscope, MessageSquare, Info, Menu } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/common/Avatar";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { AnimatedButton } from "@/components/common/AnimatedButton";
 import { PostCard } from "@/components/feed/PostCard";
 import { followUserRequest, getUserProfile, getUserPosts, unfollowUserRequest, updateUserProfile } from "@/services/api/userApi";
@@ -38,7 +39,7 @@ const GRID_ITEM_SIZE = (SCREEN_WIDTH - 3) / 3;
 const COVER_HEIGHT = 220;
 const AVATAR_SIZE = 88;
 
-const TABS = ["Grid", "Cases", "Text", "About"] as const;
+const TABS = ["Posts", "Cases", "Media", "About"] as const;
 type TabType = typeof TABS[number];
 type ProfileRoute = RouteProp<Record<string, { userId?: string } | undefined>, string>;
 
@@ -73,7 +74,7 @@ export function ProfileScreen() {
   const viewedUserId = route.params?.userId ?? authUser?._id ?? "";
   const isCurrentUser = !route.params?.userId || route.params.userId === authUser?._id;
 
-  const [tab, setTab] = useState<TabType>("Grid");
+  const [tab, setTab] = useState<TabType>("Posts");
   const [gridMode, setGridMode] = useState(true);
   const [profileUser, setProfileUser] = useState<User | null>(authUser);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -172,6 +173,21 @@ export function ProfileScreen() {
     } finally { setMessageBusy(false); }
   }, [isCurrentUser, navigation, openOrCreateConversation, profileUser]);
 
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      "Log out",
+      "You will need to sign in again to continue.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Log out", style: "destructive", onPress: () => { void logout(); } }
+      ]
+    );
+  }, [logout]);
+
+  const openSettings = useCallback(() => {
+    navigation.navigate("Settings");
+  }, [navigation]);
+
   const openComments = useCallback((post: Post) => {
     navigation.navigate("Comments", { postId: post._id, title: post.userId.name });
   }, [navigation]);
@@ -189,9 +205,9 @@ export function ProfileScreen() {
   }, [joinCaseDiscussion, navigation]);
 
   const filteredPosts = useMemo(() => {
-    if (tab === "Grid") return posts.filter(p => !!p.mediaUrl || (p.reportImages && p.reportImages.length > 0));
+    if (tab === "Posts") return posts.filter(p => !!p.mediaUrl || (p.reportImages && p.reportImages.length > 0));
     if (tab === "Cases") return posts.filter(p => p.type === "case");
-    if (tab === "Text") return posts.filter(p => p.type === "text" && !p.mediaUrl);
+    if (tab === "Media") return posts.filter(p => p.type === "text" && !p.mediaUrl);
     return [];
   }, [posts, tab]);
 
@@ -252,34 +268,41 @@ export function ProfileScreen() {
 
           {/* Cover change button (own profile only) */}
           {isCurrentUser && (
-            <Pressable
-              style={[styles.coverEditBtn, { top: insets.top + 10 }]}
-              onPress={() => void handleChangeCover()}
-              disabled={uploadingCover}
-            >
-              {uploadingCover ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <ImagePlus size={14} color="#FFFFFF" strokeWidth={2} />
-                  <Text style={styles.coverEditText}>Edit Cover</Text>
-                </>
-              )}
-            </Pressable>
+            <View style={[styles.coverActions, { top: insets.top + 10 }]}>
+              <Pressable
+                style={styles.menuBtn}
+                onPress={openSettings}
+              >
+                <Menu size={18} color="#FFFFFF" strokeWidth={2.2} />
+              </Pressable>
+              <Pressable
+                style={styles.coverEditBtn}
+                onPress={() => void handleChangeCover()}
+                disabled={uploadingCover}
+              >
+                {uploadingCover ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <ImagePlus size={14} color="#FFFFFF" strokeWidth={2} />
+                    <Text style={styles.coverEditText}>Edit Cover</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
           )}
         </View>
 
         {/* ── Avatar + actions block ────────────────────────────────────────── */}
-        <View style={[styles.profileInfoBlock, { marginTop: -(AVATAR_SIZE / 2 + 4) }]}>
-          <View style={styles.avatarRow}>
-            {/* Avatar with edit overlay */}
+        <View style={[styles.profileInfoBlock, { marginTop: -(AVATAR_SIZE / 2 + 4), backgroundColor: theme.colors.surface, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 4 }]}>
+          <View style={styles.profileIdentityColumn}>
             <View>
-              <View style={[styles.avatarRing, { borderColor: "#FFFFFF" }]}>
+              <View style={[styles.avatarRing, { borderColor: theme.colors.surface }]}>
                 <Avatar
                   name={profileUser.name}
                   uri={profileUser.profileImage}
                   size={AVATAR_SIZE}
-                  verified={profileUser.isVerified}
+                  verified={false}
                 />
               </View>
               {isCurrentUser && (
@@ -297,91 +320,108 @@ export function ProfileScreen() {
               )}
             </View>
 
-            {/* Action buttons */}
-            <View style={styles.profileActions}>
-              {!isCurrentUser ? (
-                <>
-                  <AnimatedButton
-                    title={isFollowing ? "Following" : "Follow"}
-                    variant={isFollowing ? "secondary" : "primary"}
-                    loading={relationshipBusy}
-                    onPress={handleRelationshipToggle}
-                    style={styles.actionBtn}
-                  />
-                  <AnimatedButton title="Message" variant="ghost" loading={messageBusy} onPress={handleMessage} style={styles.actionBtn} />
-                </>
-              ) : authUser?.role === "admin" ? (
-                <AnimatedButton title="Admin" variant="secondary" onPress={() => navigation.navigate("AdminPanel" as never)} style={styles.actionBtn} />
-              ) : (
-                <AnimatedButton title="Logout" variant="ghost" onPress={logout} style={styles.actionBtn} />
-              )}
+            <View style={styles.userNameRow}>
+              <Text style={[styles.userName, { color: theme.colors.textPrimary }]}>{profileUser.name}</Text>
+              {profileUser.isVerified ? <VerifiedBadge size={16} /> : null}
+            </View>
+
+            <View style={styles.userMetaRow}>
+              {profileUser.specialization ? (
+                <View style={styles.metaChip}>
+                  <Star size={12} color={theme.colors.primary} strokeWidth={2} />
+                  <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.specialization}</Text>
+                </View>
+              ) : null}
+              {profileUser.hospital ? (
+                <View style={styles.metaChip}>
+                  <MapPin size={12} color={theme.colors.textSecondary} strokeWidth={2} />
+                  <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.hospital}</Text>
+                </View>
+              ) : null}
+              {profileUser.experience ? (
+                <View style={styles.metaChip}>
+                  <Briefcase size={12} color={theme.colors.textSecondary} strokeWidth={2} />
+                  <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.experience} yrs</Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
-          <Text style={[styles.userName, { color: theme.colors.textPrimary }]}>{profileUser.name}</Text>
-          <View style={styles.userMetaRow}>
-            {profileUser.specialization ? (
-              <View style={styles.metaChip}>
-                <Star size={12} color={theme.colors.primary} strokeWidth={2} />
-                <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.specialization}</Text>
-              </View>
-            ) : null}
-            {profileUser.hospital ? (
-              <View style={styles.metaChip}>
-                <MapPin size={12} color={theme.colors.textSecondary} strokeWidth={2} />
-                <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.hospital}</Text>
-              </View>
-            ) : null}
-            {profileUser.experience ? (
-              <View style={styles.metaChip}>
-                <Briefcase size={12} color={theme.colors.textSecondary} strokeWidth={2} />
-                <Text style={[styles.metaChipText, { color: theme.colors.textSecondary }]}>{profileUser.experience} yrs</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Stats row */}
-          <View style={[styles.statsRow, { borderTopColor: theme.colors.borderLight }]}>
+          {/* Stats Horizontal Row */}
+          <View style={styles.statsRow}>
             {[
               { label: "Posts", value: stats.posts, accent: false },
               { label: "Followers", value: stats.followers, accent: false },
               { label: "Following", value: stats.following, accent: false },
               { label: "Rep.", value: stats.reputation, accent: true }
-            ].map((stat, i, arr) => (
+            ].map((stat, index) => (
               <React.Fragment key={stat.label}>
                 <View style={styles.statItem}>
                   <Text style={[styles.statValue, { color: stat.accent ? theme.colors.primary : theme.colors.textPrimary }]}>
                     {stat.value}
                   </Text>
-                  <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>{stat.label}</Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>{stat.label}</Text>
                 </View>
-                {i < arr.length - 1 && <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />}
+                {index < 3 && <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />}
               </React.Fragment>
             ))}
+          </View>
+
+          <View style={styles.profileActionsRow}>
+            {!isCurrentUser ? (
+              <>
+                <AnimatedButton
+                  title={isFollowing ? "Following" : "Follow"}
+                  variant={isFollowing ? "secondary" : "primary"}
+                  loading={relationshipBusy}
+                  onPress={handleRelationshipToggle}
+                  style={styles.actionBtnFull}
+                />
+                <AnimatedButton title="Message" variant="ghost" loading={messageBusy} onPress={handleMessage} style={styles.actionBtnHalf} />
+              </>
+            ) : (
+              <>
+                <AnimatedButton
+                  title="Edit Profile"
+                  variant="primary"
+                  onPress={openSettings}
+                  style={styles.actionBtnFull}
+                />
+                {authUser?.role === "admin" ? (
+                  <AnimatedButton title="Admin" variant="secondary" onPress={() => navigation.navigate("AdminPanel" as never)} style={styles.actionBtnHalf} />
+                ) : null}
+              </>
+            )}
           </View>
         </View>
 
         {/* ── Sticky tab bar ──────────────────────────────────────────────── */}
         <View style={[styles.tabsBar, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.borderLight }]}>
-          {TABS.map((tabItem) => {
+          <View style={styles.tabsInner}>
+            {TABS.map((tabItem) => {
             const active = tabItem === tab;
             let Icon = Grid2x2;
             if (tabItem === "Cases") Icon = Stethoscope;
-            if (tabItem === "Text") Icon = MessageSquare;
+            if (tabItem === "Media") Icon = ImageIcon;
             if (tabItem === "About") Icon = Info;
 
             return (
-              <Pressable key={tabItem} onPress={() => { hapticTap(); setTab(tabItem); }} style={styles.tabBtn}>
-                <Icon size={20} color={active ? theme.colors.primary : theme.colors.textSecondary} strokeWidth={active ? 2.5 : 2} />
-                {active && <View style={[styles.tabIndicator, { backgroundColor: theme.colors.primary }]} />}
+              <Pressable
+                key={tabItem}
+                onPress={() => { hapticTap(); setTab(tabItem); }}
+                style={({ pressed }) => [styles.tabBtn, active && styles.tabBtnActive, pressed && styles.tabBtnPressed]}
+              >
+                <Icon size={18} color={active ? theme.colors.primary : theme.colors.textTertiary} strokeWidth={active ? 2.5 : 2} />
+                <Text style={[styles.tabText, { color: active ? theme.colors.primary : theme.colors.textTertiary }]}>{tabItem}</Text>
               </Pressable>
             );
           })}
+          </View>
         </View>
 
         {/* ── Content Area ─────────────────────────────────────────────────── */}
         <View style={{ flex: 1 }}>
-          {tab === "Grid" ? (
+          {tab === "Posts" ? (
             <View style={styles.gridContainer}>
               {loadingPosts ? <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 32 }} /> :
                 filteredPosts.length === 0 ? (
@@ -398,7 +438,7 @@ export function ProfileScreen() {
                 )
               }
             </View>
-          ) : (tab === "Cases" || tab === "Text") ? (
+          ) : (tab === "Cases" || tab === "Media") ? (
             <View style={{ paddingBottom: 120 }}>
               {loadingPosts ? <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 32 }} /> :
                 filteredPosts.length === 0 ? (
@@ -408,10 +448,10 @@ export function ProfileScreen() {
                     key={item._id} 
                     post={item} 
                     currentUserId={authUser?._id} 
-                    onLike={toggleLike} 
+                    onLike={(postId) => { void toggleLike(postId); }} 
                     onComment={openComments} 
                     onShare={sharePost}
-                    onDelete={deletePost}
+                    onDelete={(post) => { void deletePost(post._id); }}
                     onJoinDiscussion={handleJoinDiscussion}
                     isAdmin={authUser?.role === "admin"}
                   />
@@ -438,19 +478,6 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* ── Activity tab ─────────────────────────────────────────────────── */}
-        {tab === "Activity" ? (
-          <View style={styles.activityWrap}>
-            <Text style={[styles.activityText, { color: theme.colors.textSecondary }]}>
-              {isCurrentUser
-                ? "Your profile is growing. Keep sharing case insights to increase credibility."
-                : `${profileUser.name} follows ${stats.following} professionals and has ${stats.followers} followers.`}
-            </Text>
-            {!isCurrentUser ? (
-              <AnimatedButton title="Message" variant="ghost" onPress={handleMessage} style={{ marginTop: 16 }} />
-            ) : null}
-          </View>
-        ) : null}
       </ScrollView>
     </View>
   );
@@ -473,8 +500,6 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   coverEditBtn: {
-    position: "absolute",
-    right: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -483,10 +508,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20
   },
+  coverActions: {
+    position: "absolute",
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  menuBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
   coverEditText: { color: "#FFFFFF", fontFamily: "Manrope_700Bold", fontSize: 12 },
   // Profile info
-  profileInfoBlock: { backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingBottom: 0 },
-  avatarRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  profileInfoBlock: { backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  profileIdentityColumn: { alignItems: "center" },
   avatarRing: { borderWidth: 3, borderRadius: 999, padding: 2 },
   avatarEditBtn: {
     position: "absolute",
@@ -501,29 +541,57 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF"
   },
-  profileActions: { flexDirection: "row", gap: 8, paddingTop: 8 },
-  actionBtn: { height: 34, paddingHorizontal: 14, borderRadius: 10, minWidth: 88 },
-  userName: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 22, marginTop: 8 },
-  userMetaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
-  metaChip: { flexDirection: "row", alignItems: "center", gap: 4 },
+  userNameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 14 },
+  userName: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 24 },
+  userMetaRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10, justifyContent: "center" },
+  metaChip: { flexDirection: "row", alignItems: "center", gap: 5 },
   metaChipText: { fontFamily: "Manrope_500Medium", fontSize: 13, textTransform: "capitalize" },
+  
+  // Horizontal Stats
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 18,
-    marginBottom: 14,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth
+    justifyContent: "center",
+    marginTop: 20,
+    marginBottom: 20,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#F8FAFC", // Fallback, will be overridden by theme
+    borderWidth: 1,
+    borderColor: "#F1F5F9"
   },
-  statItem: { flex: 1, alignItems: "center" },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  statDivider: {
+    width: 1,
+    height: "60%"
+  },
   statValue: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 18 },
-  statLabel: { fontFamily: "Manrope_500Medium", fontSize: 12, marginTop: 2 },
-  statDivider: { width: 1, height: 28 },
+  statLabel: { fontFamily: "Manrope_500Medium", fontSize: 11, marginTop: 4 },
+  
+  // Actions
+  profileActionsRow: { flexDirection: "row", gap: 10, justifyContent: "center" },
+  actionBtnFull: { flex: 1 },
+  actionBtnHalf: { flex: 0.45 },
   // Tabs
-  tabsBar: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1 },
-  tabBtn: { flex: 1, alignItems: "center", paddingVertical: 14, position: "relative" },
-  tabText: { fontFamily: "Manrope_700Bold", fontSize: 14 },
-  tabIndicator: { position: "absolute", bottom: 0, left: "15%", right: "15%", height: 2, borderRadius: 2 },
+  tabsBar: { borderBottomWidth: 1, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 10 },
+  tabsInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  tabBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    gap: 4
+  },
+  tabBtnActive: { backgroundColor: "rgba(37,99,235,0.08)" },
+  tabBtnPressed: { opacity: 0.86 },
+  tabText: { fontFamily: "Manrope_700Bold", fontSize: 12 },
   gridToggle: { padding: 14 },
   // Grid
   gridContainer: { minHeight: 100 },

@@ -11,7 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Cross, ShieldCheck } from "lucide-react-native";
+import { Cross, Lock, Mail, ShieldCheck } from "lucide-react-native";
 
 import { AnimatedButton } from "@/components/common/AnimatedButton";
 import { FloatingInput } from "@/components/common/FloatingInput";
@@ -92,6 +92,7 @@ export function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 onChangeText={setEmail}
+                leftIcon={<Mail size={20} color={theme.colors.textSecondary} />}
               />
 
               <FloatingInput
@@ -100,6 +101,7 @@ export function LoginScreen() {
                 secureTextEntry
                 onChangeText={setPassword}
                 containerStyle={styles.inputGap}
+                leftIcon={<Lock size={20} color={theme.colors.textSecondary} />}
               />
             </View>
 

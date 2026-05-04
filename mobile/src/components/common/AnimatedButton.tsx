@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 20
+    paddingHorizontal: 18
   },
   primaryLabel: {
     color: "#FFFFFF",

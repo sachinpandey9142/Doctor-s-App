@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect } from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo } from "react";
+import { ActivityIndicator, FlatList, Platform, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Bell, Briefcase, Heart, MessageCircle, UserPlus2 } from "lucide-react-native";
+import { Bell, Briefcase, CheckCheck, Heart, MessageCircle, UserPlus2 } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,6 +12,12 @@ import type { RootStackParamList } from "@/navigation/types";
 import { useNotificationStore } from "@/store/notificationStore";
 import type { NotificationItem } from "@/types/models";
 import { formatRelativeTime } from "@/utils/date";
+
+function isToday(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
 
 export function NotificationsScreen() {
   const theme = useTheme();
@@ -75,16 +81,100 @@ export function NotificationsScreen() {
     [markAsRead, navigation]
   );
 
+  const handleMarkAllRead = useCallback(async () => {
+    for (const n of notifications) {
+      if (!n.isRead) await markAsRead(n._id);
+    }
+  }, [markAsRead, notifications]);
+
+  // Group into Today / Earlier
+  const sections = useMemo(() => {
+    const today: NotificationItem[] = [];
+    const earlier: NotificationItem[] = [];
+    notifications.forEach((n) => {
+      if (isToday(n.createdAt)) today.push(n);
+      else earlier.push(n);
+    });
+    const result = [];
+    if (today.length > 0) result.push({ title: "Today", data: today });
+    if (earlier.length > 0) result.push({ title: "Earlier", data: earlier });
+    return result;
+  }, [notifications]);
+
+  const renderItem = useCallback(({ item, index }: { item: NotificationItem; index: number }) => (
+    <Animated.View entering={FadeInDown.delay(index * 30).duration(240).springify()}>
+      <Pressable
+        onPress={() => void openNotification(item)}
+        style={({ pressed }) => [
+          styles.card,
+          {
+            backgroundColor: pressed ? theme.colors.primaryLight : theme.colors.surface,
+            borderColor: theme.colors.border
+          }
+        ]}
+      >
+        {/* Unread accent bar */}
+        {!item.isRead ? (
+          <View style={[styles.unreadBar, { backgroundColor: accentForType(item.type) }]} />
+        ) : null}
+
+        <View style={[styles.iconCircle, { backgroundColor: iconBgForType(item.type) }]}>
+          {iconForType(item.type)}
+        </View>
+
+        <View style={styles.textWrap}>
+          <View style={styles.titleRow}>
+            <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }, !item.isRead && styles.cardTitleUnread]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={[styles.time, { color: theme.colors.textTertiary }]}>
+              {formatRelativeTime(item.createdAt)}
+            </Text>
+          </View>
+          <Text style={[styles.cardBody, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+            {item.body}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  ), [openNotification, theme.colors]);
+
+  if (loading && notifications.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 14, backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.borderLight }]}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Notifications</Text>
+          </View>
+        </View>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 14, backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.borderLight }]}>
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Notifications</Text>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Notifications</Text>
+            {unreadCount > 0 ? (
+              <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
+              </View>
+            ) : null}
+          </View>
           {unreadCount > 0 ? (
-            <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.badgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
-            </View>
+            <Pressable
+              onPress={() => void handleMarkAllRead()}
+              style={({ pressed }) => [styles.markAllBtn, { backgroundColor: pressed ? theme.colors.primaryLight : theme.colors.background, borderColor: theme.colors.border }]}
+            >
+              <CheckCheck size={14} color={theme.colors.primary} strokeWidth={2} />
+              <Text style={[styles.markAllText, { color: theme.colors.primary }]}>Mark all read</Text>
+            </Pressable>
           ) : null}
         </View>
         <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -92,66 +182,33 @@ export function NotificationsScreen() {
         </Text>
       </View>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 35).duration(260).springify()}>
-            <Pressable
-              onPress={() => void openNotification(item)}
-              style={({ pressed }) => [
-                styles.card,
-                {
-                  backgroundColor: pressed ? theme.colors.primaryLight : theme.colors.surface,
-                  borderColor: theme.colors.border
-                }
-              ]}
-            >
-              {/* Unread accent bar */}
-              {!item.isRead ? (
-                <View style={[styles.unreadBar, { backgroundColor: accentForType(item.type) }]} />
-              ) : null}
-
-              <View style={[styles.iconCircle, { backgroundColor: iconBgForType(item.type) }]}>
-                {iconForType(item.type)}
-              </View>
-
-              <View style={styles.textWrap}>
-                <View style={styles.titleRow}>
-                  <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.time, { color: theme.colors.textTertiary }]}>
-                    {formatRelativeTime(item.createdAt)}
-                  </Text>
-                </View>
-                <Text style={[styles.cardBody, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                  {item.body}
-                </Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-        )}
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            </View>
-          ) : (
-            <EmptyState
-              icon={<Bell size={28} color={theme.colors.primary} />}
-              title="No notifications yet"
-              body="When someone likes your post, follows you, or sends a message — it'll appear here."
-            />
-          )
-        }
-        showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={9}
-        removeClippedSubviews={Platform.OS === "android"}
-      />
+      {sections.length === 0 ? (
+        <View style={{ flex: 1 }}>
+          <EmptyState
+            icon={<Bell size={28} color={theme.colors.primary} />}
+            title="No notifications yet"
+            body="When someone likes your post, follows you, or sends a message — it'll appear here."
+          />
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.listContent}
+          renderSectionHeader={({ section }) => (
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, backgroundColor: theme.colors.background }]}>
+              {section.title}
+            </Text>
+          )}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS === "android"}
+        />
+      )}
     </View>
   );
 }
@@ -163,7 +220,8 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 26 },
   badge: {
     minWidth: 22, height: 22, borderRadius: 11,
@@ -171,7 +229,25 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: "Manrope_700Bold", fontSize: 11, color: "#FFFFFF" },
   subtitle: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13 },
-  listContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 120, gap: 8 },
+  markAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1
+  },
+  markAllText: { fontFamily: "Manrope_700Bold", fontSize: 12 },
+  sectionLabel: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.4,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 6
+  },
+  listContent: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 120, gap: 8 },
   card: {
     borderWidth: 1,
     borderRadius: 14,
@@ -204,7 +280,8 @@ const styles = StyleSheet.create({
   },
   textWrap: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  cardTitle: { fontFamily: "Manrope_700Bold", fontSize: 14, flex: 1 },
+  cardTitle: { fontFamily: "Manrope_600SemiBold", fontSize: 14, flex: 1 },
+  cardTitleUnread: { fontFamily: "Manrope_700Bold" },
   cardBody: { marginTop: 2, fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 },
   time: { fontFamily: "Manrope_500Medium", fontSize: 11, flexShrink: 0 },
   loadingWrap: { paddingTop: 40, alignItems: "center" }

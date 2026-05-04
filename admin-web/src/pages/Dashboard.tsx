@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Users, Building2, LogOut, ShieldCheck, ShieldAlert, CheckCircle } from "lucide-react";
 import { useAdminStore } from "../store/adminStore";
 import api from "../api";
@@ -76,7 +76,7 @@ export function Dashboard() {
       {/* Sidebar */}
       <aside style={{ width: '260px', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary)' }}>MediSync Admin</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary)' }}>Doctor's App Admin</h2>
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Welcome, {adminUser?.name}</p>
         </div>
         <nav style={{ flex: 1, padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

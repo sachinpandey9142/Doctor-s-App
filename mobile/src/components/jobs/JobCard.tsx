@@ -1,19 +1,27 @@
-import React, { memo } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Briefcase, MapPin, Users, DollarSign } from "lucide-react-native";
+import React, { memo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Briefcase, MapPin, Users, DollarSign, Heart } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
 
 import { AnimatedButton } from "@/components/common/AnimatedButton";
+import { hapticTap } from "@/utils/haptics";
 import type { Job } from "@/types/models";
 
 interface JobCardProps {
   job: Job;
   onApply: (jobId: string) => void;
+  isApplied?: boolean;
 }
 
-function JobCardBase({ job, onApply }: JobCardProps) {
+function JobCardBase({ job, onApply, isApplied = false }: JobCardProps) {
   const theme = useTheme();
+  const [saved, setSaved] = useState(false);
   const applicantCount = job.applicants?.length ?? 0;
+
+  const toggleSave = () => {
+    hapticTap();
+    setSaved((s) => !s);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -60,13 +68,41 @@ function JobCardBase({ job, onApply }: JobCardProps) {
         </View>
       </View>
 
-      {/* ── Apply ────────────────────────────────────────── */}
+      {/* ── Actions ──────────────────────────────────────── */}
       <View style={styles.footer}>
-        <AnimatedButton
-          title="Apply Now"
-          onPress={() => onApply(job._id)}
-          style={styles.applyBtn}
-        />
+        <View style={styles.footerRow}>
+          {isApplied ? (
+            <View style={[styles.appliedBtn, { backgroundColor: theme.colors.backgroundAlt, borderColor: theme.colors.border, flex: 1 }]}>
+              <Text style={[styles.appliedText, { color: theme.colors.textSecondary }]}>✓ Applied</Text>
+            </View>
+          ) : (
+            <AnimatedButton
+              title="Apply Now"
+              onPress={() => onApply(job._id)}
+              style={styles.applyBtn}
+            />
+          )}
+
+          {/* Save / Bookmark */}
+          <Pressable
+            onPress={toggleSave}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              {
+                backgroundColor: saved ? "#FEF2F2" : theme.colors.background,
+                borderColor: saved ? "#FECACA" : theme.colors.border,
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+          >
+            <Heart
+              size={18}
+              color={saved ? "#EF4444" : theme.colors.textTertiary}
+              fill={saved ? "#EF4444" : "transparent"}
+              strokeWidth={2}
+            />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -77,13 +113,13 @@ export const JobCard = memo(JobCardBase);
 const styles = StyleSheet.create({
   container: {
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 12,
     overflow: "hidden",
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2
   },
   header: {
@@ -96,7 +132,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0
@@ -115,10 +151,10 @@ const styles = StyleSheet.create({
   salaryBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 4,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexShrink: 0
   },
   salaryText: {
@@ -144,5 +180,27 @@ const styles = StyleSheet.create({
   metaDot: { width: 4, height: 4, borderRadius: 2 },
   metaText: { fontFamily: "Manrope_500Medium", fontSize: 12 },
   footer: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 },
-  applyBtn: {}
+  footerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  applyBtn: { flex: 1 },
+  appliedBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  appliedText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 15,
+    letterSpacing: 0.1
+  },
+  saveBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  }
 });

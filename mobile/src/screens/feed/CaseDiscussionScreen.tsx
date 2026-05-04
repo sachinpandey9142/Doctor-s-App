@@ -8,8 +8,9 @@ import {
   Text,
   View
 } from "react-native";
-import { ChevronDown, ChevronUp, Stethoscope } from "lucide-react-native";
+import { ChevronDown, ChevronUp, Stethoscope, UserX } from "lucide-react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFeedStore } from "@/store/feedStore";
@@ -78,9 +79,17 @@ export function CaseDiscussionScreen() {
                   size={40}
                 />
                 <View style={styles.authorText}>
-                  <Text style={[styles.name, { color: theme.colors.textPrimary }]}>
-                    {item.isAnonymous ? "Anonymous Case" : item.userId.name}
-                  </Text>
+                  <View style={styles.authorNameRow}>
+                    <Text style={[styles.name, { color: theme.colors.textPrimary }]}>
+                      {item.isAnonymous ? "Anonymous Case" : item.userId.name}
+                    </Text>
+                    {item.isAnonymous ? (
+                      <View style={styles.anonBadge}>
+                        <UserX size={10} color="#7C3AED" strokeWidth={2} />
+                        <Text style={styles.anonText}>Anonymous</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={[styles.meta, { color: theme.colors.textTertiary }]}>
                     {formatRelativeTime(item.createdAt)}
                   </Text>
@@ -128,16 +137,23 @@ export function CaseDiscussionScreen() {
 
                   <View style={styles.actionRow}>
                     <Pressable
-                      style={styles.outlineBtn}
+                      style={[styles.outlineBtn, { borderColor: "#C4B5FD" }]}
                       onPress={() => handleViewCase(item)}
                     >
                       <Text style={styles.outlineBtnText}>View Details</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.discussBtn, { backgroundColor: theme.colors.primary }]}
+                      style={styles.discussBtnWrap}
                       onPress={() => handleJoinChat(item)}
                     >
-                      <Text style={styles.discussBtnText}>Discuss Case</Text>
+                      <LinearGradient
+                        colors={["#2563EB", "#06B6D4"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.discussBtn}
+                      >
+                        <Text style={styles.discussBtnText}>Discuss Case</Text>
+                      </LinearGradient>
                     </Pressable>
                   </View>
                 </Animated.View>
@@ -205,13 +221,13 @@ const styles = StyleSheet.create({
   // Card
   card: {
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3
   },
   cardHeader: {
     flexDirection: "row",
@@ -221,7 +237,18 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   authorText: { flex: 1 },
+  authorNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   name: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 14 },
+  anonBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#F5F3FF",
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3
+  },
+  anonText: { fontFamily: "Manrope_700Bold", fontSize: 10, color: "#7C3AED" },
   meta: { fontFamily: "Manrope_500Medium", fontSize: 12, marginTop: 2 },
   chevronWrap: {
     width: 28,
@@ -234,7 +261,7 @@ const styles = StyleSheet.create({
   content: {
     fontFamily: "Manrope_500Medium",
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 24,
     paddingHorizontal: 14,
     paddingBottom: 14
   },
@@ -242,11 +269,11 @@ const styles = StyleSheet.create({
   expandedWrap: {
     marginHorizontal: 14,
     marginBottom: 14,
-    backgroundColor: "rgba(109,40,217,0.05)",
+    backgroundColor: "rgba(109,40,217,0.04)",
     borderWidth: 1,
     borderColor: "#DDD6FE",
-    borderRadius: 12,
-    padding: 12
+    borderRadius: 14,
+    padding: 14
   },
   expandTitleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
   expandLabel: { fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 0.8, color: "#7C3AED" },
@@ -261,24 +288,29 @@ const styles = StyleSheet.create({
   },
   outlineBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#7C3AED",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: "#FFFFFF"
   },
   outlineBtnText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 13,
     color: "#7C3AED"
   },
+  discussBtnWrap: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: "hidden"
+  },
   discussBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 14
   },
   discussBtnText: {
     fontFamily: "Manrope_700Bold",

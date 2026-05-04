@@ -2,8 +2,16 @@ const cloudinary = require("cloudinary").v2;
 const ApiError = require("../utils/ApiError");
 const catchAsync = require("../utils/catchAsync");
 
-const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
+const ALLOWED_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm"
+];
+const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
 
 const uploadImage = catchAsync(async (req, res) => {
   if (!req.file) {
@@ -11,11 +19,11 @@ const uploadImage = catchAsync(async (req, res) => {
   }
 
   if (!ALLOWED_MIME.includes(req.file.mimetype)) {
-    throw new ApiError(400, "Unsupported file type. Only JPEG, PNG, WebP, and GIF are allowed");
+    throw new ApiError(400, "Unsupported file type. Only images and MP4/MOV/WEBM videos are allowed");
   }
 
   if (req.file.size > MAX_BYTES) {
-    throw new ApiError(400, "File exceeds the 5 MB size limit");
+    throw new ApiError(400, "File exceeds the 50 MB size limit");
   }
 
   // multer v2 stores files as Uint8Array — convert to Buffer then base64 data URI
@@ -28,7 +36,8 @@ const uploadImage = catchAsync(async (req, res) => {
 
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: "doctors-app",
-    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    resource_type: "auto",
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif", "mp4", "mov", "webm"],
     transformation: [{ quality: "auto:good", fetch_format: "auto" }]
   });
 

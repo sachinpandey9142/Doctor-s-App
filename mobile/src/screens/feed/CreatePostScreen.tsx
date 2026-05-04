@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "rgba(0,0,0,0.04)",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 4,
     marginBottom: 16,
     justifyContent: "space-between"
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "transparent"
   },
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 16,
-    borderRadius: 20
+    borderRadius: 18
   },
   textArea: {
     minHeight: 120,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderRadius: 16,
+    borderRadius: 18,
     minHeight: 80,
     alignItems: "center",
     justifyContent: "center",
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   },
   previewWrap: {
     marginTop: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     height: 240,
     width: "100%",
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   },
   caseInputCard: {
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 12
   },
   caseLabel: {
@@ -430,12 +430,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 10
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 12
   },
   publishBtnWrapper: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden"
   },
   publishGradient: {

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "styled-components/native";
 import {
   ArrowLeft,
+  CheckCircle,
   Eye,
   MessageSquare,
   Share2,
@@ -84,6 +85,24 @@ export function CaseDetailScreen() {
   const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
 
   const [joining, setJoining] = useState(false);
+  const [votedOption, setVotedOption] = useState<number | null>(null);
+
+  // Demo vote counts — in a real app these come from the backend
+  const [voteCounts, setVoteCounts] = useState([14, 8, 22, 5]);
+  const DIAGNOSIS_OPTIONS = [
+    "Bacterial Pneumonia",
+    "Viral Infection (COVID-19)",
+    "Atypical Pneumonia",
+    "Pulmonary Embolism"
+  ];
+  const totalVotes = voteCounts.reduce((a, b) => a + b, 0);
+
+  const handleVote = (index: number) => {
+    if (votedOption !== null) return;
+    hapticTap();
+    setVotedOption(index);
+    setVoteCounts((prev) => prev.map((v, i) => i === index ? v + 1 : v));
+  };
 
   const isAnonymous = post.isAnonymous && post.type === "case";
   const authorName = isAnonymous ? "Anonymous Case" : post.userId.name;
@@ -110,7 +129,7 @@ export function CaseDetailScreen() {
   const handleShare = async () => {
     hapticTap();
     await Share.share({
-      title: "MediSync Case",
+      title: "Doctor's App Case",
       message: `${authorName} posted a clinical case:\n\n${post.content}`
     });
   };
@@ -207,6 +226,51 @@ export function CaseDetailScreen() {
               <Text style={[secStyles.value, { color: "#94A3B8" }]}>No observations recorded</Text>
             </View>
           )}
+        </Animated.View>
+
+        {/* Vote Diagnosis Poll */}
+        <Animated.View entering={FadeInDown.delay(170).duration(280).springify()} style={[styles.pollCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: "#EFF6FF" }]}>
+              <CheckCircle size={13} color="#2563EB" />
+            </View>
+            <Text style={styles.sectionTitle}>Vote Diagnosis</Text>
+            {votedOption !== null ? (
+              <View style={[styles.pollVotedBadge, { backgroundColor: "#EFF6FF" }]}>
+                <Text style={[styles.pollVotedText, { color: "#2563EB" }]}>{totalVotes} votes</Text>
+              </View>
+            ) : (
+              <Text style={[styles.pollHint, { color: theme.colors.textTertiary }]}>Tap to vote</Text>
+            )}
+          </View>
+          {DIAGNOSIS_OPTIONS.map((option, i) => {
+            const isVoted = votedOption === i;
+            const pct = totalVotes > 0 ? Math.round((voteCounts[i] / totalVotes) * 100) : 0;
+            return (
+              <Pressable
+                key={i}
+                onPress={() => handleVote(i)}
+                disabled={votedOption !== null}
+                style={({ pressed }) => [
+                  styles.pollOption,
+                  { borderColor: isVoted ? "#2563EB" : theme.colors.border, backgroundColor: isVoted ? "#EFF6FF" : (pressed ? theme.colors.background : theme.colors.surface) }
+                ]}
+              >
+                <View style={styles.pollOptionTop}>
+                  <View style={[styles.pollDot, { borderColor: isVoted ? "#2563EB" : theme.colors.border, backgroundColor: isVoted ? "#2563EB" : "transparent" }]} />
+                  <Text style={[styles.pollOptionText, { color: isVoted ? "#2563EB" : theme.colors.textPrimary }]} numberOfLines={1}>{option}</Text>
+                  {votedOption !== null ? (
+                    <Text style={[styles.pollPct, { color: isVoted ? "#2563EB" : theme.colors.textTertiary }]}>{pct}%</Text>
+                  ) : null}
+                </View>
+                {votedOption !== null ? (
+                  <View style={[styles.pollBarBg, { backgroundColor: theme.colors.border }]}>
+                    <View style={[styles.pollBarFill, { width: `${pct}%`, backgroundColor: isVoted ? "#2563EB" : theme.colors.textTertiary }]} />
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
         </Animated.View>
 
         {/* Report Images */}
@@ -354,5 +418,38 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 15
   },
-  ctaText: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 16, color: "#FFFFFF" }
+  ctaText: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 16, color: "#FFFFFF" },
+  // Poll
+  pollCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16
+  },
+  pollVotedBadge: {
+    marginLeft: "auto",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20
+  },
+  pollVotedText: { fontFamily: "Manrope_700Bold", fontSize: 11 },
+  pollHint: { fontFamily: "Manrope_500Medium", fontSize: 12, marginLeft: "auto" },
+  pollOption: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8
+  },
+  pollOptionTop: { flexDirection: "row", alignItems: "center", gap: 8 },
+  pollDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    flexShrink: 0
+  },
+  pollOptionText: { fontFamily: "Manrope_600SemiBold", fontSize: 13, flex: 1 },
+  pollPct: { fontFamily: "Manrope_700Bold", fontSize: 12, flexShrink: 0 },
+  pollBarBg: { height: 4, borderRadius: 2, marginTop: 8, overflow: "hidden" },
+  pollBarFill: { height: "100%", borderRadius: 2 }
 });

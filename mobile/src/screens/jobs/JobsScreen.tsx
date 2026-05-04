@@ -18,16 +18,18 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { AnimatedButton } from "@/components/common/AnimatedButton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { JobCard } from "@/components/jobs/JobCard";
+import { useAuthStore } from "@/store/authStore";
 import { useJobsStore } from "@/store/jobsStore";
 import { hapticSuccess } from "@/utils/haptics";
 import type { Job } from "@/types/models";
 
-const filters = ["All", "Hospital", "Remote", "High Pay"] as const;
+const filters = ["All", "Hospital", "Remote", "High Pay", "Part Time", "Entry Level"] as const;
 type FilterType = (typeof filters)[number];
 
 export function JobsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const currentUserId = useAuthStore((state) => state.user?._id);
   const { jobs, fetchJobs, applyToJob, createJob } = useJobsStore((state) => state);
 
   const [filter, setFilter] = useState<FilterType>("All");
@@ -51,6 +53,10 @@ export function JobsScreen() {
       return jobs.filter(
         (job) => /\d/.test(job.salary) && Number(job.salary.replace(/\D/g, "")) >= 90000
       );
+    if (filter === "Part Time")
+      return jobs.filter((job) => job.title.toLowerCase().includes("part") || job.description.toLowerCase().includes("part-time"));
+    if (filter === "Entry Level")
+      return jobs.filter((job) => job.title.toLowerCase().includes("junior") || job.description.toLowerCase().includes("entry") || job.description.toLowerCase().includes("fresher"));
     return jobs.filter((job) => job.hospital.length > 0);
   }, [filter, jobs]);
 
@@ -74,11 +80,11 @@ export function JobsScreen() {
   const renderItem = useCallback(
     ({ item, index }: { item: Job; index: number }) => (
       <Animated.View entering={FadeInDown.delay(index * 40).duration(280).springify()}>
-        <JobCard job={item} onApply={handleApply} />
+        <JobCard job={item} onApply={handleApply} isApplied={!!currentUserId && item.applicants?.includes(currentUserId)} />
       </Animated.View>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [currentUserId]
   );
 
   return (

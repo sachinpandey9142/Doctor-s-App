@@ -26,6 +26,8 @@ import { HomeFeedScreen } from "@/screens/feed/HomeFeedScreen";
 import { CaseDiscussionScreen } from "@/screens/feed/CaseDiscussionScreen";
 import { CreatePostScreen } from "@/screens/feed/CreatePostScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
+import { AddStoryScreen } from "@/screens/stories/AddStoryScreen";
+import { StoryViewerScreen } from "@/screens/stories/StoryViewerScreen";
 import { JobsScreen } from "@/screens/jobs/JobsScreen";
 import { ChatListScreen } from "@/screens/chat/ChatListScreen";
 import { ChatScreen } from "@/screens/chat/ChatScreen";
@@ -35,6 +37,7 @@ import { CommentsScreen } from "@/screens/feed/CommentsScreen";
 import { AdminPanelScreen } from "@/screens/admin/AdminPanelScreen";
 import { CaseDiscussionThreadScreen } from "@/screens/feed/CaseDiscussionThreadScreen";
 import { CaseDetailScreen } from "@/screens/feed/CaseDetailScreen";
+import { SettingsScreen } from "@/screens/profile/SettingsScreen";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -56,23 +59,29 @@ function MainTabsNavigator() {
     <MainTab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textTertiary,
+        tabBarLabelStyle: {
+          fontFamily: "Manrope_700Bold",
+          fontSize: 10,
+          marginTop: -2,
+          marginBottom: Platform.OS === "ios" ? 0 : 2
+        },
         tabBarStyle: {
-          height: Platform.OS === "ios" ? 88 : 68,
-          paddingTop: 0,
-          paddingBottom: Platform.OS === "ios" ? 20 : 0,
+          height: Platform.OS === "ios" ? 90 : 72,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === "ios" ? 26 : 10,
           borderTopWidth: 0,
-          backgroundColor: "rgba(255,255,255,0.98)",
+          backgroundColor: theme.colors.surface,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.08,
           shadowRadius: 16,
           elevation: 16
         },
-        tabBarIcon: ({ color, focused, size }) => {
-          const iconSize = 24;
+        tabBarIcon: ({ focused }) => {
+          const iconSize = 22;
           let Icon: React.ReactNode;
           switch (route.name) {
             case "HomeFeed":
@@ -81,11 +90,11 @@ function MainTabsNavigator() {
             case "CaseDiscussion":
               Icon = <ClipboardPlus color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
               break;
-            case "Jobs":
-              Icon = <Briefcase color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
-              break;
             case "ChatList":
               Icon = <MessageCircleMore color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
+              break;
+            case "Jobs":
+              Icon = <Briefcase color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
               break;
             default:
               Icon = <UserRound color={focused ? theme.colors.primary : theme.colors.textTertiary} size={iconSize} strokeWidth={focused ? 2.5 : 1.8} />;
@@ -100,18 +109,18 @@ function MainTabsNavigator() {
     >
       <MainTab.Screen name="HomeFeed" component={HomeFeedScreen} options={{ title: "Home" }} />
       <MainTab.Screen name="CaseDiscussion" component={CaseDiscussionScreen} options={{ title: "Cases" }} />
-      <MainTab.Screen name="Jobs" component={JobsScreen} />
       <MainTab.Screen name="ChatList" component={ChatListScreen} options={{ title: "Chats" }} />
-      <MainTab.Screen name="Profile" component={ProfileScreen} />
+      <MainTab.Screen name="Jobs" component={JobsScreen} options={{ title: "Jobs" }} />
+      <MainTab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
     </MainTab.Navigator>
   );
 }
 
 const tabStyles = StyleSheet.create({
   iconWrap: {
-    width: 50,
-    height: 36,
-    borderRadius: 12,
+    width: 46,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center"
   }
@@ -136,7 +145,10 @@ function MainStackNavigator() {
     >
       <RootStack.Screen name="MainTabs" component={MainTabsNavigator} options={{ headerShown: false }} />
       <RootStack.Screen name="AdminPanel" component={AdminPanelScreen} options={{ title: "Admin Dashboard" }} />
+      <RootStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
       <RootStack.Screen name="CreatePost" component={CreatePostScreen} options={{ title: "Create Post" }} />
+      <RootStack.Screen name="AddStory" component={AddStoryScreen} options={{ headerShown: false }} />
+      <RootStack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ headerShown: false }} />
       <RootStack.Screen
         name="Discover"
         component={SearchScreen}

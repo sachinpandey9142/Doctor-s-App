@@ -58,14 +58,14 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 999
   },
   label: {
     fontFamily: "Manrope_700Bold",
-    fontSize: 11,
+    fontSize: 10.5,
     letterSpacing: 0.2
   }
 });

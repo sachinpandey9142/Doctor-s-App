@@ -9,6 +9,7 @@ import Animated, {
   withSpring,
   withTiming
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 
 interface EmptyStateProps {
@@ -42,8 +43,8 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta, style, accentCo
       500,
       withRepeat(
         withSequence(
-          withTiming(-6, { duration: 1800 }),
-          withTiming(0, { duration: 1800 })
+          withTiming(-7, { duration: 2000 }),
+          withTiming(0, { duration: 2000 })
         ),
         -1,
         true
@@ -62,23 +63,23 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta, style, accentCo
 
   return (
     <Animated.View style={[styles.container, containerStyle, style]}>
-      {/* Floating icon circle */}
-      <Animated.View
-        style={[
-          styles.iconCircle,
-          {
-            backgroundColor: accentColor ?? theme.colors.primaryLight,
-            // Soft glow ring
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 12,
-            elevation: 4
-          },
-          iconStyle
-        ]}
-      >
-        {icon}
+      {/* Floating icon circle with glow */}
+      <Animated.View style={iconStyle}>
+        <LinearGradient
+          colors={accentColor ? [accentColor, accentColor] : ["#EFF6FF", "#DBEAFE"]}
+          style={[
+            styles.iconCircle,
+            {
+              shadowColor: theme.colors.primary,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.18,
+              shadowRadius: 18,
+              elevation: 6
+            }
+          ]}
+        >
+          {icon}
+        </LinearGradient>
       </Animated.View>
 
       <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
@@ -87,9 +88,19 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta, style, accentCo
       {ctaLabel && onCta ? (
         <Pressable
           onPress={onCta}
-          style={[styles.cta, { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.primaryMid }]}
+          style={({ pressed }) => [
+            styles.cta,
+            { opacity: pressed ? 0.82 : 1 }
+          ]}
         >
-          <Text style={[styles.ctaText, { color: theme.colors.primary }]}>{ctaLabel}</Text>
+          <LinearGradient
+            colors={["#2563EB", "#06B6D4"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ctaGrad}
+          >
+            <Text style={styles.ctaText}>{ctaLabel}</Text>
+          </LinearGradient>
         </Pressable>
       ) : null}
     </Animated.View>
@@ -100,38 +111,45 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     paddingHorizontal: 32,
-    paddingVertical: 32
+    paddingVertical: 40
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
+    width: 80,
+    height: 80,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20
+    marginBottom: 24
   },
   title: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 20,
-    textAlign: "center"
+    fontSize: 21,
+    textAlign: "center",
+    letterSpacing: -0.3
   },
   body: {
-    marginTop: 8,
+    marginTop: 10,
     fontFamily: "Manrope_500Medium",
     fontSize: 14,
     lineHeight: 22,
     textAlign: "center"
   },
   cta: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1
+    marginTop: 22,
+    borderRadius: 14,
+    overflow: "hidden"
+  },
+  ctaGrad: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center"
   },
   ctaText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 14,
+    color: "#FFFFFF",
     letterSpacing: 0.2
   }
 });

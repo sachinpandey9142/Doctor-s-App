@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
-  View
+  View,
+  ScrollView
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -168,6 +169,7 @@ function PostCardBase({
   const tapXRef = useRef(0);
   const tapYRef = useRef(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Animated values
   const cardScale = useSharedValue(1);
@@ -293,7 +295,7 @@ function PostCardBase({
     hapticTap();
     if (onShare) { onShare(post); return; }
     const author = isAnonymous ? "Anonymous Case" : post.userId.name;
-    await Share.share({ title: "MediSync", message: `${author}:\n\n${post.content}` });
+    await Share.share({ title: "Doctor's App", message: `${author}:\n\n${post.content}` });
   };
 
   const handleSave = () => {
@@ -314,8 +316,55 @@ function PostCardBase({
         onClose={() => setOptionsVisible(false)}
       />
 
+      {isExpanded && (
+        <Modal transparent visible={isExpanded} animationType="fade" onRequestClose={() => setIsExpanded(false)} statusBarTranslucent>
+          <TouchableWithoutFeedback onPress={() => setIsExpanded(false)}>
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 16 }}>
+              <View style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", maxHeight: "90%" }}>
+                <View style={{ padding: 12, flexDirection: "row", justifyContent: "flex-end" }}>
+                  <Pressable onPress={() => setIsExpanded(false)} style={{ padding: 6 }}>
+                    <Text style={{ fontSize: 18 }}>✕</Text>
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={{ padding: 12 }}>
+                  {hasMedia ? (
+                    <Image source={{ uri: mediaUri }} style={{ width: "100%", height: 420, borderRadius: 12 }} contentFit="cover" />
+                  ) : null}
+                  <Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold", fontSize: 16 }}>{isAnonymous ? "Anonymous Case" : post.userId.name}</Text>
+                  {post.content ? <Text style={{ marginTop: 8, fontFamily: "Manrope_500Medium", fontSize: 15 }}>{post.content}</Text> : null}
+                  {post.type === "case" && (
+                    <>
+                      {post.symptoms ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold" }}>Symptoms</Text><Text style={{ marginTop: 4 }}>{post.symptoms}</Text></> : null}
+                      {post.observations ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold" }}>Observations</Text><Text style={{ marginTop: 4 }}>{post.observations}</Text></> : null}
+                      {post.reportImages && post.reportImages.length > 0 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+                          {post.reportImages.map((img, idx) => (
+                            <Image key={idx} source={{ uri: img }} style={{ width: 280, height: 200, borderRadius: 10, marginRight: 10 }} contentFit="cover" />
+                          ))}
+                        </ScrollView>
+                      )}
+                    </>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
       <AnimatedPressable
-        style={[styles.container, cardAnimStyle]}
+        style={[
+          styles.container,
+          cardAnimStyle,
+          {
+            backgroundColor: theme.colors.surfaceElevated,
+            borderColor: theme.colors.cardBorder,
+            shadowColor: theme.shadow.card.shadowColor,
+            shadowOpacity: theme.shadow.card.shadowOpacity,
+            shadowRadius: theme.shadow.card.shadowRadius,
+            elevation: theme.shadow.card.elevation
+          }
+        ]}
         onPressIn={handleCardPressIn}
         onPressOut={handleCardPressOut}
         onPress={handleCardPress}
@@ -366,37 +415,40 @@ function PostCardBase({
 
         {/* ── Media ── hero element ─────────────────────────────── */}
         {hasMedia ? (
-          <View style={styles.mediaContainer}>
-            <Image
-              source={{ uri: mediaUri }}
-              style={styles.postImage}
-              contentFit="cover"
-              transition={350}
-            />
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.35)"]}
-              start={{ x: 0, y: 0.4 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-            {post.type === "video" && (
-              <View style={styles.videoOverlay}>
-                <View style={styles.playCircle}>
-                  <PlayCircle size={52} color="#FFFFFF" />
+          <Pressable onPress={() => setIsExpanded(true)} style={{ borderRadius: 14, overflow: 'hidden' }}>
+            <View style={styles.mediaContainer}>
+              <Image
+                source={{ uri: mediaUri }}
+                style={styles.postImage}
+                contentFit="cover"
+                transition={350}
+              />
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.35)"]}
+                start={{ x: 0, y: 0.4 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              {post.type === "video" && (
+                <View style={styles.videoOverlay}>
+                  <View style={styles.playCircle}>
+                    <PlayCircle size={52} color="#FFFFFF" />
+                  </View>
                 </View>
-              </View>
-            )}
-            {/* Position-aware double-tap heart */}
-            <Animated.View style={[styles.bigHeart, bigHeartAnimStyle]} pointerEvents="none">
-              <Heart size={84} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
-            </Animated.View>
-          </View>
+              )}
+              {/* Position-aware double-tap heart */}
+              <Animated.View style={[styles.bigHeart, bigHeartAnimStyle]} pointerEvents="none">
+                <Heart size={84} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+              </Animated.View>
+            </View>
+          </Pressable>
         ) : null}
 
         {/* ── Case block ──────────────────────────────────────────── */}
         {post.type === "case" ? (
-          <View style={styles.caseBox}>
+          <Pressable onPress={() => setIsExpanded(true)} style={{ borderRadius: 12, overflow: 'hidden' }}>
+            <View style={styles.caseBox}>
             <View style={styles.caseTitleRow}>
               <View style={styles.caseIconWrap}>
                 <Stethoscope size={11} color="#7C3AED" strokeWidth={2.2} />
@@ -439,6 +491,7 @@ function PostCardBase({
               )}
             </View>
           </View>
+        </Pressable>
         ) : null}
 
         {/* ── Actions row ─────────────────────────────────────────── */}
@@ -504,14 +557,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
     overflow: "hidden",
-    shadowColor: "#64748B",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3
   },
   header: {
     flexDirection: "row",
@@ -550,7 +597,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 14,
     overflow: "hidden",
-    height: 248,
+    height: 240,
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
@@ -630,7 +677,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth
   },
@@ -640,7 +687,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 10
+    borderRadius: 12
   },
   actionBtnLiked: { backgroundColor: "#FFF1F2" },
   bookmarkBtn: { marginLeft: "auto" },
@@ -653,16 +700,11 @@ const optStyles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 34,
     paddingTop: 12,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 20
   },
   handle: {
     alignSelf: "center",

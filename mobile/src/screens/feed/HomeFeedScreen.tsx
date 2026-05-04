@@ -11,7 +11,7 @@ import {
   View
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Activity, Bell, Plus, Search } from "lucide-react-native";
@@ -21,10 +21,12 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import { PostCard } from "@/components/feed/PostCard";
+import { StoryBar } from "@/components/stories/StoryBar";
 import type { RootStackParamList } from "@/navigation/types";
 import { useAuthStore } from "@/store/authStore";
 import { useFeedStore } from "@/store/feedStore";
 import { useChatStore } from "@/store/chatStore";
+import { useNotificationStore } from "@/store/notificationStore";
 import { hapticTap } from "@/utils/haptics";
 import type { Post } from "@/types/models";
 
@@ -61,11 +63,15 @@ export function HomeFeedScreen() {
   const { posts, loading, refreshing, fetchInitialFeed, fetchMoreFeed, refreshFeed, toggleLike, deletePost } =
     useFeedStore((state) => state);
   const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const skeletonOpacity = useRef(new RNAnimated.Value(1)).current;
   const prevLoadingRef = useRef(loading);
   const headerScrollY = useRef(new RNAnimated.Value(0)).current;
+  const feedListRef = useRef<FlatList<Post> | null>(null);
+  const headerTopPad = insets.top;
+  const [headerHeight, setHeaderHeight] = useState(headerTopPad + 222);
 
   useEffect(() => {
     if (prevLoadingRef.current && !loading) {
@@ -111,15 +117,21 @@ export function HomeFeedScreen() {
     navigation.navigate("CaseDetail", { post });
   }, [navigation]);
 
+  const handleBrandPress = useCallback(() => {
+    hapticTap();
+    setActiveFilter("All");
+    feedListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
   const renderItem = useCallback(({ item, index }: { item: Post; index: number }) => (
     <Animated.View entering={FadeInDown.delay(Math.min(index * 40, 200)).duration(280).springify()}>
       <PostCard
         post={item}
         currentUserId={user?._id}
-        onLike={toggleLike}
+        onLike={(postId) => { void toggleLike(postId); }}
         onComment={openComments}
         onAuthorPress={openProfile}
-        onDelete={deletePost}
+        onDelete={(post) => { void deletePost(post._id); }}
         onJoinDiscussion={handleJoinDiscussion}
         onViewCase={handleViewCase}
         isAdmin={user?.role === "admin"}
@@ -129,22 +141,29 @@ export function HomeFeedScreen() {
 
   const skeletonColors = useMemo(() => ({ surface: theme.colors.surface }), [theme.colors]);
 
-  // Header white bg fades in as user scrolls
-  const headerBgOpacity = headerScrollY.interpolate({ inputRange: [0, 50], outputRange: [0, 1], extrapolate: "clamp" });
-  const headerBorderOpacity = headerScrollY.interpolate({ inputRange: [20, 60], outputRange: [0, 1], extrapolate: "clamp" });
-  const headerTopPad = insets.top;
-  const listTopPad = headerTopPad + 112;
+  // Header fades out smoothly as content scrolls underneath.
+  const headerBgOpacity = headerScrollY.interpolate({ inputRange: [0, 130], outputRange: [1, 0], extrapolate: "clamp" });
+  const headerBorderOpacity = headerScrollY.interpolate({ inputRange: [80, 180], outputRange: [1, 0], extrapolate: "clamp" });
+  const headerContentOpacity = headerScrollY.interpolate({ inputRange: [0, 220], outputRange: [1, 0], extrapolate: "clamp" });
+  const headerContentTranslate = headerScrollY.interpolate({ inputRange: [0, 220], outputRange: [0, -18], extrapolate: "clamp" });
+  const brandTextOpacity = headerScrollY.interpolate({ inputRange: [0, 120], outputRange: [1, 0], extrapolate: "clamp" });
+  const brandTextTranslate = headerScrollY.interpolate({ inputRange: [0, 120], outputRange: [0, -10], extrapolate: "clamp" });
+  const listTopPad = headerHeight;
   const showSkeleton = loading && posts.length === 0;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* ── Fixed header ──────────────────────────────────────── */}
-      <View style={[styles.headerWrap, { paddingTop: headerTopPad }]}>
-        {/* Animated white bg on scroll */}
+      <SafeAreaView
+        edges={["top"]}
+        style={styles.headerWrap}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+      >
+        {/* Animated white bg on scroll — only for brand area */}
         <RNAnimated.View
           style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: theme.colors.surface, opacity: headerBgOpacity }
+            styles.brandBgOverlay,
+            { backgroundColor: theme.colors.surface, opacity: headerBgOpacity, height: headerHeight }
           ]}
         />
         {/* Animated bottom border on scroll */}
@@ -157,7 +176,7 @@ export function HomeFeedScreen() {
 
         {/* Brand + actions */}
         <View style={styles.headerInner}>
-          <View style={styles.brandRow}>
+          <Pressable onPress={handleBrandPress} style={({ pressed }) => [styles.brandRow, pressed && styles.brandRowPressed]}>
             <LinearGradient
               colors={["#2563EB", "#06B6D4"]}
               start={{ x: 0, y: 0 }}
@@ -166,8 +185,13 @@ export function HomeFeedScreen() {
             >
               <Activity size={15} color="#FFFFFF" strokeWidth={2.5} />
             </LinearGradient>
-            <Text style={[styles.brandName, { color: theme.colors.textPrimary }]}>MediSync</Text>
-          </View>
+            <RNAnimated.View style={{ opacity: brandTextOpacity, transform: [{ translateY: brandTextTranslate }] }}>
+              <Text style={[styles.brandName, { color: theme.colors.textPrimary }]}>Doctor's App</Text>
+              <Text style={[styles.brandSubtext, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                Tap to jump to the top
+              </Text>
+            </RNAnimated.View>
+          </Pressable>
 
           <View style={styles.headerActions}>
             <Pressable
@@ -187,16 +211,26 @@ export function HomeFeedScreen() {
               onPress={() => { hapticTap(); navigation.navigate("Notifications"); }}
             >
               <Bell size={17} color={theme.colors.textPrimary} strokeWidth={2} />
+              {unreadCount > 0 ? (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+                </View>
+              ) : null}
             </Pressable>
           </View>
         </View>
 
-        {/* Filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
-        >
+        <RNAnimated.View style={{ opacity: headerContentOpacity, transform: [{ translateY: headerContentTranslate }] }}>
+          <View style={styles.storyBarWrap}>
+            <StoryBar />
+          </View>
+
+          {/* Filter chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterList}
+          >
           {FILTERS.map((filter) => {
             const active = activeFilter === filter;
             return (
@@ -225,8 +259,9 @@ export function HomeFeedScreen() {
               </Pressable>
             );
           })}
-        </ScrollView>
-      </View>
+          </ScrollView>
+        </RNAnimated.View>
+      </SafeAreaView>
 
       {/* ── Feed / Skeleton ──────────────────────────────────── */}
       {showSkeleton ? (
@@ -235,6 +270,7 @@ export function HomeFeedScreen() {
         </RNAnimated.View>
       ) : (
         <FlatList
+          ref={feedListRef}
           data={filteredPosts}
           renderItem={renderItem}
           keyExtractor={(item) => item._id}
@@ -309,6 +345,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4
   },
+  brandBgOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 62
+  },
   headerBorder: {
     position: "absolute",
     bottom: 0,
@@ -323,11 +366,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11
   },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  brandRow: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
+  brandRowPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   brandIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
+    marginRight: 9,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -336,7 +381,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: -0.4
   },
-  headerActions: { flexDirection: "row", gap: 8 },
+  brandSubtext: {
+    marginTop: -1,
+    fontFamily: "Manrope_500Medium",
+    fontSize: 11
+  },
+  headerActions: { flexDirection: "row" },
   headerBtn: {
     width: 38,
     height: 38,
@@ -344,22 +394,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2
+  ,
+    marginLeft: 8
+  },
+  bellBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF"
+  },
+  bellBadgeText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 8,
+    color: "#FFFFFF",
+    lineHeight: 12
+  },
+  storyBarWrap: {
+    paddingBottom: 6
   },
   // Filter chips
   filterList: {
     paddingHorizontal: 14,
     paddingBottom: 10,
-    gap: 7,
-    flexDirection: "row"
+    flexDirection: "row",
+    alignItems: "center"
   },
   filterChip: {
     borderRadius: 999,
-    overflow: "hidden"
+    overflow: "hidden",
+    marginRight: 7
   },
   filterChipActive: {
     borderRadius: 999,
@@ -383,14 +460,14 @@ const styles = StyleSheet.create({
   fab: {
     width: 54,
     height: 54,
-    borderRadius: 17,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#2563EB",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.38,
+    shadowOpacity: 0.35,
     shadowRadius: 18,
-    elevation: 12
+    elevation: 8
   }
 });
 

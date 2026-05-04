@@ -17,8 +17,9 @@ import {
 } from "@expo-google-fonts/space-grotesk";
 
 import AppNavigator from "./src/navigation/AppNavigator";
-import { theme } from "./src/constants/theme";
+import { darkTheme, lightTheme } from "./src/constants/theme";
 import { useAuthStore } from "./src/store/authStore";
+import { useThemeStore } from "./src/store/themeStore";
 import { Toast } from "./src/components/common/Toast";
 
 SplashScreen.preventAutoHideAsync().catch(() => null);
@@ -26,6 +27,9 @@ SplashScreen.preventAutoHideAsync().catch(() => null);
 export default function App() {
   const hydrate = useAuthStore((state) => state.hydrate);
   const isHydrated = useAuthStore((state) => state.isHydrated);
+  const hydrateTheme = useThemeStore((state) => state.hydrate);
+  const isThemeHydrated = useThemeStore((state) => state.isHydrated);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
 
   const [fontsLoaded] = useFonts({
     Manrope_500Medium,
@@ -39,20 +43,26 @@ export default function App() {
   }, [hydrate]);
 
   useEffect(() => {
+    hydrateTheme();
+  }, [hydrateTheme]);
+
+  useEffect(() => {
     if (fontsLoaded && isHydrated) {
       SplashScreen.hideAsync().catch(() => null);
     }
   }, [fontsLoaded, isHydrated]);
 
-  if (!fontsLoaded || !isHydrated) {
+  if (!fontsLoaded || !isHydrated || !isThemeHydrated) {
     return null;
   }
+
+  const appTheme = isDarkMode ? darkTheme : lightTheme;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider theme={theme}>
-          <StatusBar style="dark" />
+        <ThemeProvider theme={appTheme}>
+          <StatusBar style={isDarkMode ? "light" : "dark"} backgroundColor={appTheme.colors.background} />
           <AppNavigator />
           {/* Global toast overlay — rendered above everything, respects safe area insets */}
           <Toast />

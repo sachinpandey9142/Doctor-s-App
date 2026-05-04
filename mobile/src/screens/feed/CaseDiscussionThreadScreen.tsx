@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -46,7 +46,10 @@ export function CaseDiscussionThreadScreen() {
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
 
-  const messages = (messagesByConversation[conversationId] || []).slice().reverse();
+  const messages = useMemo(() => {
+    const ordered = (messagesByConversation[conversationId] || []).slice().reverse();
+    return Array.from(new Map(ordered.map((message) => [message._id, message])).values());
+  }, [conversationId, messagesByConversation]);
   const pagination = paginationByConversation[conversationId];
 
   useEffect(() => {
@@ -152,7 +155,7 @@ export function CaseDiscussionThreadScreen() {
         <FlatList
           ref={listRef}
           data={messages}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => `${item._id}-${index}`}
           renderItem={renderMessage}
           contentContainerStyle={[styles.messageList, { paddingBottom: 16 }]}
           inverted
@@ -290,7 +293,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 24,
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 10,

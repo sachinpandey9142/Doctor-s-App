@@ -153,17 +153,17 @@ const styles = StyleSheet.create({
     gap: 4
   },
   bubbleWrap: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderTopLeftRadius: 4,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2
   },
   sendBtn: {
     width: 40,
@@ -200,12 +200,17 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingTop: 10,
-    borderTopWidth: 1
+    borderTopWidth: 1,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 8
   },
   inputWrap: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 22,
+    borderRadius: 24,
     paddingHorizontal: 14,
     paddingVertical: 8,
     minHeight: 44,

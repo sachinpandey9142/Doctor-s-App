@@ -180,7 +180,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messagesByConversation: {
         ...state.messagesByConversation,
-        [conversationId]: [...(state.messagesByConversation[conversationId] || []), message]
+        [conversationId]: mergeMessages(state.messagesByConversation[conversationId] || [], [message])
       },
       conversations: sortConversations(
         state.conversations.map((conversation) =>

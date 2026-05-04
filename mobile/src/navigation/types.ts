@@ -17,7 +17,13 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   AdminPanel: undefined;
+  Settings: undefined;
   CreatePost: undefined;
+  AddStory: undefined;
+  StoryViewer: {
+    userId: string;
+    storyId?: string;
+  };
   Discover: undefined;
   UserProfile: {
     userId: string;

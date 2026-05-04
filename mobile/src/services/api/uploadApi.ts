@@ -15,7 +15,7 @@ interface UploadResult {
  * @param uri - Local file URI from expo-image-picker (e.g. file:///data/user/...)
  * @returns Secure Cloudinary URL safe to store in DB and display to all users
  */
-export const uploadImageRequest = async (uri: string): Promise<string> => {
+export const uploadMediaRequest = async (uri: string): Promise<string> => {
   // Build multipart/form-data — React Native requires this manual form-data approach
   const formData = new FormData();
 
@@ -26,7 +26,10 @@ export const uploadImageRequest = async (uri: string): Promise<string> => {
     jpeg: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
-    gif: "image/gif"
+    gif: "image/gif",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm"
   };
   const type = mimeTypeMap[extension] ?? "image/jpeg";
 
@@ -45,3 +48,5 @@ export const uploadImageRequest = async (uri: string): Promise<string> => {
 
   return response.data.data.url;
 };
+
+export const uploadImageRequest = uploadMediaRequest;

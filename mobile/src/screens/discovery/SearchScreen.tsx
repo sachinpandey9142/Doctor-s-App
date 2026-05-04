@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
     gap: 8
@@ -326,23 +326,23 @@ const styles = StyleSheet.create({
   // ── User card
   card: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2
   },
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 14,
+    gap: 12,
+    padding: 16,
     paddingBottom: 12
   },
   profileText: { flex: 1 },
-  name: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 15 },
+  name: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 16 },
   role: { marginTop: 3, fontFamily: "Manrope_700Bold", fontSize: 12, textTransform: "capitalize" },
   hospital: { marginTop: 2, fontFamily: "Manrope_500Medium", fontSize: 12 },
   // ── Stats row
@@ -351,10 +351,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 10
+    paddingVertical: 12
   },
   stat: { flex: 1, alignItems: "center" },
-  statVal: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 15 },
+  statVal: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 17 },
   statKey: { fontFamily: "Manrope_500Medium", fontSize: 11, marginTop: 1 },
   statDivider: { width: 1, height: 24, marginHorizontal: 4 },
   msgBtn: { flex: 1, alignItems: "center" },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   // ── Action chip (inline follow button)
   chip: {
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 7,
     flexShrink: 0
