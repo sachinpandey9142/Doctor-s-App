@@ -13,7 +13,8 @@ const connectDB = async () => {
       console.log(`MongoDB connected: ${mongoose.connection.host}`);
       return;
     } catch (error) {
-      console.warn("Primary MongoDB connection failed, falling back to in-memory MongoDB.");
+      console.warn("Primary MongoDB connection failed:", error.message);
+      console.warn("Falling back to in-memory MongoDB.");
     }
   }
 

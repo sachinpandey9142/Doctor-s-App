@@ -1,11 +1,12 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const http = require("http");
 const app = require("./app");
 const connectDB = require("./config/db");
 const initializeSocket = require("./sockets/chatSocket");
 
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.BACKEND_PORT || process.env.PORT || 8080);
 
 const startServer = async () => {
   await connectDB();
