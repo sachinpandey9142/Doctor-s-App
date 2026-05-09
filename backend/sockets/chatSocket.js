@@ -10,8 +10,8 @@ const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST"],
+    },
   });
 
   // ─── Auth middleware ─────────────────────────────────────────────────────────
@@ -55,16 +55,20 @@ const initializeSocket = (httpServer) => {
       try {
         const conversation = await Conversation.findOne({
           _id: conversationId,
-          participants: socket.userId
+          participants: socket.userId,
         });
 
         if (!conversation) {
-          socket.emit("socketError", { message: "Conversation not found or access denied" });
+          socket.emit("socketError", {
+            message: "Conversation not found or access denied",
+          });
           return;
         }
 
         socket.join(String(conversationId));
-        socket.emit("joinedConversation", { conversationId: String(conversationId) });
+        socket.emit("joinedConversation", {
+          conversationId: String(conversationId),
+        });
       } catch (_error) {
         socket.emit("socketError", { message: "Unable to join conversation" });
       }
@@ -86,7 +90,7 @@ const initializeSocket = (httpServer) => {
 
         const conversation = await Conversation.findOne({
           _id: conversationId,
-          participants: socket.userId
+          participants: socket.userId,
         });
 
         if (!conversation) {
@@ -97,24 +101,37 @@ const initializeSocket = (httpServer) => {
           conversationId,
           senderId: socket.userId,
           text,
-          mediaUrl
+          mediaUrl,
         });
 
         conversation.lastMessage = text || "Sent an attachment";
         await conversation.save();
 
-        const hydratedMessage = await Message.findById(createdMessage._id).populate(
+        const hydratedMessage = await Message.findById(
+          createdMessage._id,
+        ).populate(
           "senderId",
-          "name profileImage role isVerified specialization"
+          "name profileImage role isVerified specialization",
         );
 
         io.to(String(conversationId)).emit("receiveMessage", {
           conversationId: String(conversationId),
-          message: hydratedMessage
+          message: hydratedMessage,
+        });
+
+        const participantIds = new Set(
+          (conversation.participants || []).map((participantId) =>
+            String(participantId),
+          ),
+        );
+        participantIds.forEach((participantId) => {
+          io.to(`user:${participantId}`).emit("conversationUpdated", {
+            conversationId: String(conversationId),
+          });
         });
 
         const recipients = (conversation.participants || []).filter(
-          (participantId) => String(participantId) !== String(socket.userId)
+          (participantId) => String(participantId) !== String(socket.userId),
         );
 
         await Promise.all(
@@ -125,15 +142,15 @@ const initializeSocket = (httpServer) => {
               title: "New message",
               body: text || "You received a media message",
               referenceId: String(conversation._id),
-              triggerUserId: socket.userId
-            })
-          )
+              triggerUserId: socket.userId,
+            }),
+          ),
         );
 
         recipients.forEach((recipientId) => {
           io.to(`user:${String(recipientId)}`).emit("notification", {
             type: "message",
-            conversationId: String(conversationId)
+            conversationId: String(conversationId),
           });
         });
 
@@ -142,9 +159,14 @@ const initializeSocket = (httpServer) => {
         }
       } catch (error) {
         if (typeof ack === "function") {
-          ack({ success: false, message: error.message || "Failed to send message" });
+          ack({
+            success: false,
+            message: error.message || "Failed to send message",
+          });
         } else {
-          socket.emit("socketError", { message: error.message || "Failed to send message" });
+          socket.emit("socketError", {
+            message: error.message || "Failed to send message",
+          });
         }
       }
     });

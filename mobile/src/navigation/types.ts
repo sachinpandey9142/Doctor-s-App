@@ -17,8 +17,16 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   CreatePost: undefined;
   Discover: undefined;
+  CreateGroup: undefined;
   UserProfile: {
     userId: string;
+  };
+  Followers: {
+    userId: string;
+    title?: string;
+  };
+  GroupMembers: {
+    conversationId: string;
   };
   Comments: {
     postId: string;
@@ -27,6 +35,10 @@ export type RootStackParamList = {
   ChatScreen: {
     conversationId: string;
     title?: string;
+    avatarUri?: string;
+    isGroup?: boolean;
+    groupName?: string;
+    groupImage?: string;
   };
   Notifications: undefined;
 };

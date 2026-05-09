@@ -12,8 +12,6 @@ build/
 app/build/
 
 # ── Environment / Secrets ─────────────────────────────────────────────────────
-.env
-.env.local
 .env.*.local
 # Keep the example file (no secrets)
 !.env.example
@@ -58,7 +56,6 @@ ios/.xcode.env.local
 
 # ── IDE / Editor ──────────────────────────────────────────────────────────────
 .idea/
-.vscode/
 *.swp
 *.swo
 .DS_Store
@@ -81,3 +78,7 @@ out/
 !gradle/wrapper/gradle-wrapper.properties
 !gradlew
 !gradlew.bat
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+config.bat

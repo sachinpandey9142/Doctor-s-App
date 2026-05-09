@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Search, Sparkles } from "lucide-react-native";
@@ -12,7 +20,7 @@ import {
   followUserRequest,
   getSuggestedUsersRequest,
   searchUsersRequest,
-  unfollowUserRequest
+  unfollowUserRequest,
 } from "@/services/api/userApi";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
@@ -20,10 +28,13 @@ import type { User } from "@/types/models";
 
 export function SearchScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const authUser = useAuthStore((state) => state.user);
   const updateSessionUser = useAuthStore((state) => state.updateUser);
-  const openOrCreateConversation = useChatStore((state) => state.openOrCreateConversation);
+  const openOrCreateConversation = useChatStore(
+    (state) => state.openOrCreateConversation,
+  );
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
@@ -92,15 +103,22 @@ export function SearchScreen() {
   }, [authUser?._id, query, results, suggested]);
 
   const syncUser = (updatedUser: User) => {
-    setResults((state) => state.map((item) => (item._id === updatedUser._id ? updatedUser : item)));
-    setSuggested((state) => state.map((item) => (item._id === updatedUser._id ? updatedUser : item)));
+    setResults((state) =>
+      state.map((item) => (item._id === updatedUser._id ? updatedUser : item)),
+    );
+    setSuggested((state) =>
+      state.map((item) => (item._id === updatedUser._id ? updatedUser : item)),
+    );
   };
 
   const toggleFollow = async (user: User) => {
     setBusyUserId(user._id);
     try {
-      const isFollowing = !!authUser?._id && user.followers.includes(authUser._id);
-      const response = isFollowing ? await unfollowUserRequest(user._id) : await followUserRequest(user._id);
+      const isFollowing =
+        !!authUser?._id && user.followers.includes(authUser._id);
+      const response = isFollowing
+        ? await unfollowUserRequest(user._id)
+        : await followUserRequest(user._id);
       syncUser(response.target);
       await updateSessionUser(response.viewer);
     } finally {
@@ -118,7 +136,9 @@ export function SearchScreen() {
       const conversation = await openOrCreateConversation(user._id);
       navigation.navigate("ChatScreen", {
         conversationId: conversation._id,
-        title: user.name
+        title: user.name,
+        avatarUri: user.profileImage,
+        isGroup: false,
       });
     } finally {
       setMessageUserId(null);
@@ -126,8 +146,18 @@ export function SearchScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.searchWrap, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <View
+        style={[
+          styles.searchWrap,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
         <Search size={18} color={theme.colors.primary} />
         <TextInput
           value={query}
@@ -142,7 +172,9 @@ export function SearchScreen() {
         <Text style={[styles.heading, { color: theme.colors.textPrimary }]}>
           {query.trim() ? "Search Results" : "Suggested Professionals"}
         </Text>
-        <Text style={[styles.subheading, { color: theme.colors.textSecondary }]}>
+        <Text
+          style={[styles.subheading, { color: theme.colors.textSecondary }]}
+        >
           {query.trim()
             ? "Explore profiles by name, role, specialization, or hospital."
             : "Start with verified and active professionals from the network."}
@@ -163,37 +195,77 @@ export function SearchScreen() {
               <View style={styles.emptyIcon}>
                 <Sparkles size={20} color={theme.colors.primary} />
               </View>
-              <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No matches yet</Text>
-              <Text style={[styles.emptyBody, { color: theme.colors.textSecondary }]}>
+              <Text
+                style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}
+              >
+                No matches yet
+              </Text>
+              <Text
+                style={[
+                  styles.emptyBody,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
                 Try another name, hospital, or specialization.
               </Text>
             </GlassCard>
           }
           renderItem={({ item }) => {
-            const isFollowing = !!authUser?._id && item.followers.includes(authUser._id);
+            const isFollowing =
+              !!authUser?._id && item.followers.includes(authUser._id);
             const followLoading = busyUserId === item._id;
             const messageLoading = messageUserId === item._id;
 
             return (
               <GlassCard style={styles.card}>
-                <Pressable onPress={() => openProfile(item._id)} style={styles.profileRow}>
-                  <Avatar name={item.name} uri={item.profileImage} size={54} verified={item.isVerified} />
+                <Pressable
+                  onPress={() => openProfile(item._id)}
+                  style={styles.profileRow}
+                >
+                  <Avatar
+                    name={item.name}
+                    uri={item.profileImage}
+                    size={54}
+                    verified={item.isVerified}
+                  />
                   <View style={styles.profileTextWrap}>
-                    <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{item.name}</Text>
-                    <Text style={[styles.role, { color: theme.colors.primary }]}>
-                      {item.role} | {item.specialization || "Medical Professional"}
+                    <Text
+                      style={[styles.name, { color: theme.colors.textPrimary }]}
+                    >
+                      {item.name}
                     </Text>
-                    <Text style={[styles.hospital, { color: theme.colors.textSecondary }]}>
+                    <Text
+                      style={[styles.role, { color: theme.colors.primary }]}
+                    >
+                      {item.role} |{" "}
+                      {item.specialization || "Medical Professional"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.hospital,
+                        { color: theme.colors.textSecondary },
+                      ]}
+                    >
                       {item.hospital || "Hospital not added yet"}
                     </Text>
                   </View>
                 </Pressable>
 
                 <View style={styles.metricsRow}>
-                  <Text style={[styles.metric, { color: theme.colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.metric,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
                     Followers: {item.followers.length}
                   </Text>
-                  <Text style={[styles.metric, { color: theme.colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.metric,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
                     Reputation: {item.reputationScore}
                   </Text>
                 </View>
@@ -205,22 +277,43 @@ export function SearchScreen() {
                     style={[
                       styles.primaryAction,
                       {
-                        backgroundColor: isFollowing ? theme.colors.surface : theme.colors.primary,
-                        borderColor: theme.colors.primary
-                      }
+                        backgroundColor: isFollowing
+                          ? theme.colors.surface
+                          : theme.colors.primary,
+                        borderColor: theme.colors.primary,
+                      },
                     ]}
                   >
-                    <Text style={[styles.primaryActionText, { color: isFollowing ? theme.colors.primary : "#FFFFFF" }]}>
-                      {followLoading ? "Saving..." : isFollowing ? "Following" : "Follow"}
+                    <Text
+                      style={[
+                        styles.primaryActionText,
+                        {
+                          color: isFollowing ? theme.colors.primary : "#FFFFFF",
+                        },
+                      ]}
+                    >
+                      {followLoading
+                        ? "Saving..."
+                        : isFollowing
+                          ? "Following"
+                          : "Follow"}
                     </Text>
                   </Pressable>
 
                   <Pressable
                     onPress={() => openMessage(item)}
                     disabled={messageLoading}
-                    style={[styles.secondaryAction, { borderColor: theme.colors.border }]}
+                    style={[
+                      styles.secondaryAction,
+                      { borderColor: theme.colors.border },
+                    ]}
                   >
-                    <Text style={[styles.secondaryActionText, { color: theme.colors.textPrimary }]}>
+                    <Text
+                      style={[
+                        styles.secondaryActionText,
+                        { color: theme.colors.textPrimary },
+                      ]}
+                    >
                       {messageLoading ? "Opening..." : "Message"}
                     </Text>
                   </Pressable>
@@ -237,7 +330,7 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
   searchWrap: {
     marginHorizontal: 16,
@@ -248,77 +341,77 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    gap: 10
+    gap: 10,
   },
   searchInput: {
     flex: 1,
     fontFamily: "Manrope_500Medium",
-    fontSize: 15
+    fontSize: 15,
   },
   headingWrap: {
     paddingHorizontal: 16,
     paddingTop: 18,
-    paddingBottom: 8
+    paddingBottom: 8,
   },
   heading: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 26
+    fontSize: 26,
   },
   subheading: {
     marginTop: 6,
     fontFamily: "Manrope_500Medium",
     fontSize: 14,
-    lineHeight: 21
+    lineHeight: 21,
   },
   loadingWrap: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
-    gap: 12
+    gap: 12,
   },
   card: {
-    marginBottom: 2
+    marginBottom: 2,
   },
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 12,
   },
   profileTextWrap: {
-    flex: 1
+    flex: 1,
   },
   name: {
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 16
+    fontSize: 16,
   },
   role: {
     marginTop: 4,
     fontFamily: "Manrope_700Bold",
     fontSize: 13,
-    textTransform: "capitalize"
+    textTransform: "capitalize",
   },
   hospital: {
     marginTop: 4,
     fontFamily: "Manrope_500Medium",
-    fontSize: 13
+    fontSize: 13,
   },
   metricsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 14
+    marginTop: 14,
   },
   metric: {
     fontFamily: "Manrope_500Medium",
-    fontSize: 12
+    fontSize: 12,
   },
   actionsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 14
+    marginTop: 14,
   },
   primaryAction: {
     flex: 1,
@@ -326,11 +419,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     minHeight: 44,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   primaryActionText: {
     fontFamily: "Manrope_700Bold",
-    fontSize: 14
+    fontSize: 14,
   },
   secondaryAction: {
     flex: 1,
@@ -339,15 +432,15 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.7)"
+    backgroundColor: "rgba(255,255,255,0.7)",
   },
   secondaryActionText: {
     fontFamily: "Manrope_700Bold",
-    fontSize: 14
+    fontSize: 14,
   },
   emptyCard: {
     marginTop: 24,
-    alignItems: "center"
+    alignItems: "center",
   },
   emptyIcon: {
     width: 42,
@@ -356,18 +449,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(37, 99, 235, 0.12)",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "center"
+    alignSelf: "center",
   },
   emptyTitle: {
     marginTop: 12,
     textAlign: "center",
     fontFamily: "SpaceGrotesk_700Bold",
-    fontSize: 17
+    fontSize: 17,
   },
   emptyBody: {
     marginTop: 6,
     textAlign: "center",
     fontFamily: "Manrope_500Medium",
-    fontSize: 13
-  }
+    fontSize: 13,
+  },
 });
