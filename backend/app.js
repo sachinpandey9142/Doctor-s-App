@@ -8,6 +8,7 @@ const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const groupRoutes = require("./routes/groupRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
@@ -19,7 +20,7 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
   api_key: process.env.CLOUDINARY_API_KEY || "",
   api_secret: process.env.CLOUDINARY_API_SECRET || "",
-  secure: true
+  secure: true,
 });
 
 const app = express();
@@ -27,8 +28,8 @@ const app = express();
 app.use(
   cors({
     origin: true,
-    credentials: true
-  })
+    credentials: true,
+  }),
 );
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -38,7 +39,9 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use("/uploads", express.static("uploads"));
 
 app.get("/health", (_req, res) => {
-  res.status(200).json({ success: true, message: "Doctor,s App backend is healthy" });
+  res
+    .status(200)
+    .json({ success: true, message: "Doctor,s App backend is healthy" });
 });
 
 app.use("/api/auth", authRoutes);
@@ -46,6 +49,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api", chatRoutes);
+app.use("/api/groups", groupRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", uploadRoutes);
 

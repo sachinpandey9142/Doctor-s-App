@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       required: true,
-      enum: ["doctor", "nurse", "lab-technician", "medical-student", "hospital-staff", "other"]
+      enum: ["admin", "doctor", "nurse", "lab-technician", "medical-student", "hospital-staff", "other"]
     },
     specialization: {
       type: String,

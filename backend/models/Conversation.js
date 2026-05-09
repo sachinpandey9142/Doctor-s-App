@@ -6,23 +6,61 @@ const conversationSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
-      }
+        required: true,
+      },
     ],
     participantsHash: {
       type: String,
-      required: true,
       unique: true,
-      index: true
+      sparse: true,
+      index: true,
     },
+    isGroup: {
+      type: Boolean,
+      default: false,
+    },
+    groupName: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 120,
+    },
+    groupImage: {
+      type: String,
+      default: "",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    admins: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    clearedBy: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        clearedAt: {
+          type: Date,
+          required: true,
+          default: Date.now,
+        },
+      },
+    ],
     lastMessage: {
       type: String,
-      default: ""
-    }
+      default: "",
+    },
   },
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 conversationSchema.index({ updatedAt: -1 });
