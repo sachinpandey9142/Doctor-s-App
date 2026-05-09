@@ -61,6 +61,15 @@ export interface Conversation {
   _id: string;
   participants: User[];
   lastMessage: string;
+  isGroup?: boolean;
+  groupName?: string;
+  groupImage?: string;
+  createdBy?: User;
+  admins?: User[];
+  clearedBy?: Array<{
+    userId: string;
+    clearedAt: string;
+  }>;
   updatedAt: string;
 }
 
