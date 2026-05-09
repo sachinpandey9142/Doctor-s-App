@@ -6,25 +6,37 @@ const {
   createConversation,
   getConversations,
   getMessages,
-  sendMessage
+  sendMessage,
 } = require("../controllers/chatController");
 const {
   createConversationValidation,
   sendMessageValidation,
-  conversationMessagesValidation
+  conversationMessagesValidation,
 } = require("../validations/chatValidation");
 
 const router = express.Router();
 
-router.post("/conversations", authMiddleware, createConversationValidation, validateRequest, createConversation);
+router.post(
+  "/conversations",
+  authMiddleware,
+  createConversationValidation,
+  validateRequest,
+  createConversation,
+);
 router.get("/conversations", authMiddleware, getConversations);
 router.get(
   "/messages/:conversationId",
   authMiddleware,
   conversationMessagesValidation,
   validateRequest,
-  getMessages
+  getMessages,
 );
-router.post("/messages", authMiddleware, sendMessageValidation, validateRequest, sendMessage);
+router.post(
+  "/messages",
+  authMiddleware,
+  sendMessageValidation,
+  validateRequest,
+  sendMessage,
+);
 
 module.exports = router;
