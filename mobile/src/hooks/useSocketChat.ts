@@ -7,7 +7,7 @@ import {
   disconnectSocket,
   getSocket,
   setReconnectCallback,
-  type ReceiveMessagePayload
+  type ReceiveMessagePayload,
 } from "@/services/socket/socketClient";
 
 /**
@@ -19,7 +19,10 @@ import {
  */
 export const useSocketChat = () => {
   const token = useAuthStore((state) => state.token);
-  const appendIncomingMessage = useChatStore((state) => state.appendIncomingMessage);
+  const currentUserId = useAuthStore((state) => state.user?._id);
+  const appendIncomingMessage = useChatStore(
+    (state) => state.appendIncomingMessage,
+  );
   const fetchConversations = useChatStore((state) => state.fetchConversations);
 
   // Use a ref so the reconnect callback can always access the latest fetchConversations
@@ -42,15 +45,30 @@ export const useSocketChat = () => {
     });
 
     const handleReceiveMessage = (payload: ReceiveMessagePayload) => {
+      if (
+        currentUserId &&
+        String(payload.message.senderId?._id || "") === String(currentUserId)
+      ) {
+        return;
+      }
+
       appendIncomingMessage(payload);
     };
 
+    const handleConversationUpdated = () => {
+      void fetchConversationsRef.current();
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
+    socket.on("conversationUpdated", handleConversationUpdated);
+    socket.on("conversationRemoved", handleConversationUpdated);
 
     return () => {
       const activeSocket = getSocket();
       activeSocket?.off("receiveMessage", handleReceiveMessage);
+      activeSocket?.off("conversationUpdated", handleConversationUpdated);
+      activeSocket?.off("conversationRemoved", handleConversationUpdated);
       setReconnectCallback(null);
     };
-  }, [appendIncomingMessage, token]);
+  }, [appendIncomingMessage, currentUserId, token]);
 };
