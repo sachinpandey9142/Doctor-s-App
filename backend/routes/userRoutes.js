@@ -10,24 +10,93 @@ const {
   getSuggestedUsers,
   followUser,
   unfollowUser,
-  getFollowers
+  getFollowers,
+  getFollowing,
+  removeFollower,
 } = require("../controllers/userController");
 const {
   updateUserValidation,
   userIdValidation,
   searchUsersValidation,
-  targetUserValidation
+  relationListValidation,
+  targetUserValidation,
+  followerIdValidation,
 } = require("../validations/userValidation");
 
 const router = express.Router();
 
-router.put("/update", authMiddleware, updateUserValidation, validateRequest, updateUser);
-router.get("/search", authMiddleware, searchUsersValidation, validateRequest, searchUsers);
-router.get("/suggested", authMiddleware, searchUsersValidation, validateRequest, getSuggestedUsers);
-router.post("/:targetUserId/follow", authMiddleware, targetUserValidation, validateRequest, followUser);
-router.post("/:targetUserId/unfollow", authMiddleware, targetUserValidation, validateRequest, unfollowUser);
-router.get("/:id/followers", authMiddleware, userIdValidation, validateRequest, getFollowers);
-router.get("/:id/posts", authMiddleware, userIdValidation, validateRequest, getUserPosts);
-router.get("/:id", authMiddleware, userIdValidation, validateRequest, getUserById);
+router.put(
+  "/update",
+  authMiddleware,
+  updateUserValidation,
+  validateRequest,
+  updateUser,
+);
+router.get(
+  "/search",
+  authMiddleware,
+  searchUsersValidation,
+  validateRequest,
+  searchUsers,
+);
+router.get(
+  "/suggested",
+  authMiddleware,
+  searchUsersValidation,
+  validateRequest,
+  getSuggestedUsers,
+);
+router.post(
+  "/:targetUserId/follow",
+  authMiddleware,
+  targetUserValidation,
+  validateRequest,
+  followUser,
+);
+router.post(
+  "/:targetUserId/unfollow",
+  authMiddleware,
+  targetUserValidation,
+  validateRequest,
+  unfollowUser,
+);
+router.get(
+  "/:id/followers",
+  authMiddleware,
+  userIdValidation,
+  relationListValidation,
+  validateRequest,
+  getFollowers,
+);
+router.get(
+  "/:id/following",
+  authMiddleware,
+  userIdValidation,
+  relationListValidation,
+  validateRequest,
+  getFollowing,
+);
+router.delete(
+  "/:targetUserId/followers/:followerId",
+  authMiddleware,
+  targetUserValidation,
+  followerIdValidation,
+  validateRequest,
+  removeFollower,
+);
+router.get(
+  "/:id/posts",
+  authMiddleware,
+  userIdValidation,
+  validateRequest,
+  getUserPosts,
+);
+router.get(
+  "/:id",
+  authMiddleware,
+  userIdValidation,
+  validateRequest,
+  getUserById,
+);
 
 module.exports = router;

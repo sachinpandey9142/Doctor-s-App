@@ -25,6 +25,14 @@ export type RootStackParamList = {
     storyId?: string;
   };
   Discover: undefined;
+  Followers: {
+    userId: string;
+    kind: "followers" | "following";
+  };
+  Following: {
+    userId: string;
+    kind: "followers" | "following";
+  };
   UserProfile: {
     userId: string;
   };
@@ -33,6 +41,17 @@ export type RootStackParamList = {
     title?: string;
   };
   ChatScreen: {
+    conversationId: string;
+    title?: string;
+  };
+  CreateGroupScreen:
+    | {
+        groupId?: string;
+        existingMemberIds?: string[];
+        title?: string;
+      }
+    | undefined;
+  GroupMembersScreen: {
     conversationId: string;
     title?: string;
   };

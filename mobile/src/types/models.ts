@@ -85,11 +85,16 @@ export interface Job {
 export interface Conversation {
   _id: string;
   participants: User[];
+  admins?: User[];
+  createdBy?: User;
   lastMessage: string;
   updatedAt: string;
   isGroup?: boolean;
   title?: string;
+  image?: string;
   postId?: string;
+  unreadCount?: number;
+  unreadCounts?: Record<string, number>;
 }
 
 export interface Message {
@@ -99,6 +104,7 @@ export interface Message {
   text: string;
   mediaUrl: string;
   createdAt: string;
+  readBy?: string[];
 }
 
 export interface NotificationItem {

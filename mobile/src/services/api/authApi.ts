@@ -21,12 +21,53 @@ interface AuthResult {
   user: User;
 }
 
-export const registerRequest = async (payload: RegisterPayload): Promise<AuthResult> => {
-  const response = await apiClient.post<ApiResponse<AuthResult>>("/auth/register", payload);
+export const registerRequest = async (
+  payload: RegisterPayload,
+): Promise<AuthResult> => {
+  if (__DEV__) {
+    console.log("[authApi] register request", {
+      baseURL: apiClient.defaults.baseURL,
+      email: payload.email,
+      role: payload.role,
+    });
+  }
+
+  const response = await apiClient.post<ApiResponse<AuthResult>>(
+    "/auth/register",
+    payload,
+  );
+
+  if (__DEV__) {
+    console.log("[authApi] register response", {
+      status: response.status,
+      userRole: response.data?.data?.user?.role,
+    });
+  }
+
   return response.data.data;
 };
 
-export const loginRequest = async (payload: AuthPayload): Promise<AuthResult> => {
-  const response = await apiClient.post<ApiResponse<AuthResult>>("/auth/login", payload);
+export const loginRequest = async (
+  payload: AuthPayload,
+): Promise<AuthResult> => {
+  if (__DEV__) {
+    console.log("[authApi] login request", {
+      baseURL: apiClient.defaults.baseURL,
+      email: payload.email,
+    });
+  }
+
+  const response = await apiClient.post<ApiResponse<AuthResult>>(
+    "/auth/login",
+    payload,
+  );
+
+  if (__DEV__) {
+    console.log("[authApi] login response", {
+      status: response.status,
+      userRole: response.data?.data?.user?.role,
+    });
+  }
+
   return response.data.data;
 };

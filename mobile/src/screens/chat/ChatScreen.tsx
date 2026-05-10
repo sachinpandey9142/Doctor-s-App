@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,9 +14,9 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from "react-native";
-import { SendHorizontal, Paperclip } from "lucide-react-native";
+import { SendHorizontal, Paperclip, Users } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -32,8 +38,14 @@ export function ChatScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "ChatScreen">>();
 
   const user = useAuthStore((state) => state.user);
-  const { messagesByConversation, paginationByConversation, fetchMessages, loadOlderMessages, sendMessage } =
-    useChatStore((state) => state);
+  const {
+    conversations,
+    messagesByConversation,
+    paginationByConversation,
+    fetchMessages,
+    loadOlderMessages,
+    sendMessage,
+  } = useChatStore((state) => state);
 
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
@@ -42,41 +54,103 @@ export function ChatScreen() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const conversationId = route.params.conversationId;
-  const messages = (messagesByConversation[conversationId] || []).slice().reverse();
+  const messages = (messagesByConversation[conversationId] || [])
+    .slice()
+    .reverse();
   const pagination = paginationByConversation[conversationId];
+  const conversation = conversations.find(
+    (item) => item._id === conversationId,
+  );
+  const isGroup = Boolean(conversation?.isGroup);
+  const title =
+    route.params.title ||
+    conversation?.title ||
+    (isGroup ? "Group Chat" : "Conversation");
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
+      headerRight: isGroup
+        ? () => (
+            <Pressable
+              onPress={() =>
+                navigation.navigate("GroupMembersScreen", {
+                  conversationId,
+                  title,
+                })
+              }
+              style={headerStyles.infoButton}
+            >
+              <Users size={18} color={theme.colors.primary} strokeWidth={2.2} />
+            </Pressable>
+          )
+        : undefined,
       headerTitle: () => (
-        <View>
-          <Text style={[headerStyles.title, { color: theme.colors.textPrimary }]}>
-            {route.params.title || "Conversation"}
-          </Text>
+        <Pressable
+          onPress={() => {
+            if (isGroup) {
+              navigation.navigate("GroupMembersScreen", {
+                conversationId,
+                title,
+              });
+            }
+          }}
+          style={headerStyles.titleWrap}
+        >
+          <View>
+            <Text
+              style={[headerStyles.title, { color: theme.colors.textPrimary }]}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+          </View>
           <View style={headerStyles.statusRow}>
             <View style={headerStyles.onlineDot} />
-            <Text style={[headerStyles.statusText, { color: theme.colors.textSecondary }]}>Online</Text>
+            <Text
+              style={[
+                headerStyles.statusText,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              {isGroup
+                ? `${conversation?.participants?.length || 0} members`
+                : "Online"}
+            </Text>
           </View>
-        </View>
-      )
+        </Pressable>
+      ),
     });
-  }, [navigation, route.params.title, theme.colors]);
+  }, [
+    conversation?.participants?.length,
+    conversation?.title,
+    conversationId,
+    isGroup,
+    navigation,
+    theme.colors,
+    title,
+  ]);
 
   useEffect(() => {
     fetchMessages(conversationId);
     const socket = getSocket();
     socket?.emit("joinConversation", { conversationId });
+    socket?.emit("markConversationRead", { conversationId });
 
     // Listen for typing events
-    socket?.on("userTyping", ({ conversationId: cid }: { conversationId: string }) => {
-      if (cid === conversationId) {
-        setIsTyping(true);
-        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = setTimeout(() => setIsTyping(false), 2500);
-      }
-    });
+    socket?.on(
+      "userTyping",
+      ({ conversationId: cid }: { conversationId: string }) => {
+        if (cid === conversationId) {
+          setIsTyping(true);
+          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = setTimeout(() => setIsTyping(false), 2500);
+        }
+      },
+    );
 
     return () => {
+      socket?.emit("stopTyping", { conversationId });
       socket?.off("userTyping");
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
@@ -99,16 +173,15 @@ export function ChatScreen() {
     }
   };
 
-  const handleLoadOlder = useCallback(() => { void loadOlderMessages(conversationId); }, [conversationId, loadOlderMessages]);
+  const handleLoadOlder = useCallback(() => {
+    void loadOlderMessages(conversationId);
+  }, [conversationId, loadOlderMessages]);
 
   const renderItem = useCallback(
     ({ item }: { item: Message }) => (
-      <ChatBubble
-        message={item}
-        isMine={item.senderId._id === user?._id}
-      />
+      <ChatBubble message={item} isMine={item.senderId._id === user?._id} />
     ),
-    [user?._id]
+    [user?._id],
   );
 
   const listFooter = pagination?.loading ? (
@@ -141,11 +214,34 @@ export function ChatScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           isTyping ? (
-            <View style={[styles.typingBubble, { backgroundColor: theme.colors.surface }]}>
+            <View
+              style={[
+                styles.typingBubble,
+                { backgroundColor: theme.colors.surface },
+              ]}
+            >
               <View style={styles.typingDots}>
-                <View style={[styles.dot, { backgroundColor: theme.colors.textTertiary }]} />
-                <View style={[styles.dot, { backgroundColor: theme.colors.textTertiary, marginHorizontal: 3 }]} />
-                <View style={[styles.dot, { backgroundColor: theme.colors.textTertiary }]} />
+                <View
+                  style={[
+                    styles.dot,
+                    { backgroundColor: theme.colors.textTertiary },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: theme.colors.textTertiary,
+                      marginHorizontal: 3,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dot,
+                    { backgroundColor: theme.colors.textTertiary },
+                  ]}
+                />
               </View>
             </View>
           ) : null
@@ -153,17 +249,48 @@ export function ChatScreen() {
       />
 
       {/* ── Input bar ──────────────────────────────────── */}
-      <View style={[styles.inputBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border, paddingBottom: insets.bottom + 10 }]}>
-        <Pressable style={[styles.attachBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-          <Paperclip size={17} color={theme.colors.textSecondary} strokeWidth={2} />
+      <View
+        style={[
+          styles.inputBar,
+          {
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.border,
+            paddingBottom: insets.bottom + 10,
+          },
+        ]}
+      >
+        <Pressable
+          style={[
+            styles.attachBtn,
+            {
+              backgroundColor: theme.colors.background,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
+          <Paperclip
+            size={17}
+            color={theme.colors.textSecondary}
+            strokeWidth={2}
+          />
         </Pressable>
 
-        <View style={[styles.inputWrap, { backgroundColor: "#F1F5F9", borderColor: theme.colors.border }]}>
+        <View
+          style={[
+            styles.inputWrap,
+            { backgroundColor: "#F1F5F9", borderColor: theme.colors.border },
+          ]}
+        >
           <TextInput
             ref={inputRef}
             value={messageText}
-            onChangeText={(t) => { setMessageText(t); emitTyping(); }}
-            placeholder="Type a secure message…"
+            onChangeText={(t) => {
+              setMessageText(t);
+              emitTyping();
+            }}
+            placeholder={
+              isGroup ? "Message the group…" : "Type a secure message…"
+            }
             placeholderTextColor={theme.colors.textTertiary}
             style={[styles.input, { color: theme.colors.textPrimary }]}
             multiline
@@ -178,7 +305,11 @@ export function ChatScreen() {
           style={styles.sendBtnWrap}
         >
           <LinearGradient
-            colors={canSend ? ["#2563EB", "#06B6D4"] : [theme.colors.border, theme.colors.border]}
+            colors={
+              canSend
+                ? ["#2563EB", "#06B6D4"]
+                : [theme.colors.border, theme.colors.border]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.sendBtn}
@@ -196,10 +327,29 @@ export function ChatScreen() {
 }
 
 const headerStyles = StyleSheet.create({
+  titleWrap: { maxWidth: "88%" },
   title: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 16 },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
-  onlineDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#10B981" },
-  statusText: { fontFamily: "Manrope_500Medium", fontSize: 11 }
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 1,
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#10B981",
+  },
+  statusText: { fontFamily: "Manrope_500Medium", fontSize: 11 },
+  infoButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(37,99,235,0.08)",
+  },
 });
 
 const styles = StyleSheet.create({
@@ -207,7 +357,7 @@ const styles = StyleSheet.create({
   messagesContent: {
     paddingHorizontal: 10,
     paddingTop: 20,
-    paddingBottom: 10
+    paddingBottom: 10,
   },
   loadingOlderWrap: { paddingVertical: 12, alignItems: "center" },
   typingBubble: {
@@ -221,7 +371,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 2
+    elevation: 2,
   },
   typingDots: { flexDirection: "row", alignItems: "center" },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
@@ -237,7 +387,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.14,
     shadowRadius: 12,
-    elevation: 8
+    elevation: 8,
   },
   attachBtn: {
     width: 42,
@@ -246,7 +396,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0
+    flexShrink: 0,
   },
   inputWrap: {
     flex: 1,
@@ -255,13 +405,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     minHeight: 48,
-    justifyContent: "center"
+    justifyContent: "center",
   },
   input: {
     fontFamily: "Manrope_500Medium",
     fontSize: 15,
     maxHeight: 100,
-    lineHeight: 22
+    lineHeight: 22,
   },
   sendBtnWrap: {},
   sendBtn: {
@@ -274,6 +424,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
-    elevation: 8
-  }
+    elevation: 8,
+  },
 });

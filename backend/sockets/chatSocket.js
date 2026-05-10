@@ -6,12 +6,75 @@ const Message = require("../models/Message");
 const User = require("../models/User");
 const { createNotification } = require("../services/notificationService");
 
+const conversationSelect =
+  "name profileImage role isVerified specialization hospital experience reputationScore followers following createdAt";
+
+const conversationParticipantIds = (conversation) =>
+  (conversation?.participants || []).map((participant) =>
+    String(participant._id || participant),
+  );
+
+const conversationAdminIds = (conversation) =>
+  (conversation?.admins || []).map((participant) =>
+    String(participant._id || participant),
+  );
+
+const isMember = (conversation, userId) =>
+  conversationParticipantIds(conversation).includes(String(userId));
+
+const getUnreadCount = (conversation, userId) => {
+  const unreadCounts = conversation?.unreadCounts;
+  const key = String(userId);
+
+  if (!unreadCounts) {
+    return 0;
+  }
+
+  if (typeof unreadCounts.get === "function") {
+    return Number(unreadCounts.get(key) || 0);
+  }
+
+  return Number(unreadCounts[key] || 0);
+};
+
+const toConversationPayload = (conversation, userId) => {
+  const payload = conversation?.toJSON
+    ? conversation.toJSON()
+    : { ...conversation };
+  if (!payload) {
+    return null;
+  }
+
+  payload.unreadCount = getUnreadCount(conversation, userId);
+  return payload;
+};
+
+const updateUnreadCountsForMessage = (conversation, senderId) => {
+  const unreadCounts = conversation.unreadCounts || {};
+  const sender = String(senderId);
+
+  conversationParticipantIds(conversation).forEach((participantId) => {
+    const nextValue =
+      participantId === sender
+        ? 0
+        : getUnreadCount(conversation, participantId) + 1;
+
+    if (typeof unreadCounts.set === "function") {
+      unreadCounts.set(participantId, nextValue);
+    } else {
+      unreadCounts[participantId] = nextValue;
+    }
+  });
+
+  conversation.unreadCounts = unreadCounts;
+};
+
 const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST"],
+    },
   });
 
   // ─── Auth middleware ─────────────────────────────────────────────────────────
@@ -55,18 +118,128 @@ const initializeSocket = (httpServer) => {
       try {
         const conversation = await Conversation.findOne({
           _id: conversationId,
-          participants: socket.userId
+          participants: socket.userId,
         });
 
         if (!conversation) {
-          socket.emit("socketError", { message: "Conversation not found or access denied" });
+          socket.emit("socketError", {
+            message: "Conversation not found or access denied",
+          });
           return;
         }
 
         socket.join(String(conversationId));
-        socket.emit("joinedConversation", { conversationId: String(conversationId) });
+        socket.emit("joinedConversation", {
+          conversationId: String(conversationId),
+        });
+
+        if (conversation) {
+          await Promise.all([
+            Conversation.findByIdAndUpdate(conversationId, {
+              $set: {
+                [`unreadCounts.${String(socket.userId)}`]: 0,
+              },
+            }),
+            Message.updateMany(
+              { conversationId, readBy: { $ne: socket.userId } },
+              { $addToSet: { readBy: socket.userId } },
+            ),
+          ]);
+
+          const updatedConversation = await Conversation.findById(
+            conversationId,
+          )
+            .populate("participants", conversationSelect)
+            .populate("admins", conversationSelect)
+            .populate("createdBy", conversationSelect);
+
+          io.to(`user:${socket.userId}`).emit(
+            "conversationUpdated",
+            toConversationPayload(updatedConversation, socket.userId),
+          );
+        }
       } catch (_error) {
         socket.emit("socketError", { message: "Unable to join conversation" });
+      }
+    });
+
+    socket.on("typing", async ({ conversationId }) => {
+      try {
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: socket.userId,
+        });
+
+        if (!conversation) {
+          return;
+        }
+
+        socket.to(String(conversationId)).emit("userTyping", {
+          conversationId: String(conversationId),
+          senderId: socket.userId,
+          senderName: socket.userName,
+          isGroup: Boolean(conversation.isGroup),
+        });
+      } catch (_error) {
+        // Ignore transient typing errors.
+      }
+    });
+
+    socket.on("stopTyping", async ({ conversationId }) => {
+      try {
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: socket.userId,
+        });
+
+        if (!conversation) {
+          return;
+        }
+
+        socket.to(String(conversationId)).emit("userTypingStopped", {
+          conversationId: String(conversationId),
+          senderId: socket.userId,
+          isGroup: Boolean(conversation.isGroup),
+        });
+      } catch (_error) {
+        // Ignore transient typing errors.
+      }
+    });
+
+    socket.on("markConversationRead", async ({ conversationId }) => {
+      try {
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: socket.userId,
+        });
+
+        if (!conversation) {
+          return;
+        }
+
+        await Promise.all([
+          Conversation.findByIdAndUpdate(conversationId, {
+            $set: {
+              [`unreadCounts.${String(socket.userId)}`]: 0,
+            },
+          }),
+          Message.updateMany(
+            { conversationId, readBy: { $ne: socket.userId } },
+            { $addToSet: { readBy: socket.userId } },
+          ),
+        ]);
+
+        const updatedConversation = await Conversation.findById(conversationId)
+          .populate("participants", conversationSelect)
+          .populate("admins", conversationSelect)
+          .populate("createdBy", conversationSelect);
+
+        io.to(`user:${socket.userId}`).emit(
+          "conversationUpdated",
+          toConversationPayload(updatedConversation, socket.userId),
+        );
+      } catch (_error) {
+        // Ignore read-state issues on reconnect.
       }
     });
 
@@ -86,7 +259,7 @@ const initializeSocket = (httpServer) => {
 
         const conversation = await Conversation.findOne({
           _id: conversationId,
-          participants: socket.userId
+          participants: socket.userId,
         });
 
         if (!conversation) {
@@ -97,24 +270,42 @@ const initializeSocket = (httpServer) => {
           conversationId,
           senderId: socket.userId,
           text,
-          mediaUrl
+          mediaUrl,
+          readBy: [socket.userId],
         });
 
         conversation.lastMessage = text || "Sent an attachment";
+        updateUnreadCountsForMessage(conversation, socket.userId);
         await conversation.save();
 
-        const hydratedMessage = await Message.findById(createdMessage._id).populate(
+        const hydratedMessage = await Message.findById(
+          createdMessage._id,
+        ).populate(
           "senderId",
-          "name profileImage role isVerified specialization"
+          "name profileImage role isVerified specialization hospital experience",
         );
 
         io.to(String(conversationId)).emit("receiveMessage", {
           conversationId: String(conversationId),
-          message: hydratedMessage
+          message: hydratedMessage,
         });
 
+        const updatedConversation = await Conversation.findById(conversationId)
+          .populate("participants", conversationSelect)
+          .populate("admins", conversationSelect)
+          .populate("createdBy", conversationSelect);
+
+        conversationParticipantIds(updatedConversation).forEach(
+          (participantId) => {
+            io.to(`user:${participantId}`).emit(
+              "conversationUpdated",
+              toConversationPayload(updatedConversation, participantId),
+            );
+          },
+        );
+
         const recipients = (conversation.participants || []).filter(
-          (participantId) => String(participantId) !== String(socket.userId)
+          (participantId) => String(participantId) !== String(socket.userId),
         );
 
         await Promise.all(
@@ -125,15 +316,15 @@ const initializeSocket = (httpServer) => {
               title: "New message",
               body: text || "You received a media message",
               referenceId: String(conversation._id),
-              triggerUserId: socket.userId
-            })
-          )
+              triggerUserId: socket.userId,
+            }),
+          ),
         );
 
         recipients.forEach((recipientId) => {
           io.to(`user:${String(recipientId)}`).emit("notification", {
             type: "message",
-            conversationId: String(conversationId)
+            conversationId: String(conversationId),
           });
         });
 
@@ -142,9 +333,14 @@ const initializeSocket = (httpServer) => {
         }
       } catch (error) {
         if (typeof ack === "function") {
-          ack({ success: false, message: error.message || "Failed to send message" });
+          ack({
+            success: false,
+            message: error.message || "Failed to send message",
+          });
         } else {
-          socket.emit("socketError", { message: error.message || "Failed to send message" });
+          socket.emit("socketError", {
+            message: error.message || "Failed to send message",
+          });
         }
       }
     });

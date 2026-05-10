@@ -7,7 +7,7 @@ const catchAsync = require("../utils/catchAsync");
 
 const signToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "7d"
+    expiresIn: "7d",
   });
 
 const register = catchAsync(async (req, res) => {
@@ -20,8 +20,16 @@ const register = catchAsync(async (req, res) => {
     hospital = "",
     experience = 0,
     profileImage = "",
-    idDocument = ""
+    idDocument = "",
   } = req.body;
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[auth] register request", {
+      email,
+      role,
+      hasPassword: Boolean(password),
+    });
+  }
 
   const normalizedEmail = String(email).toLowerCase().trim();
   const existingUser = await User.findOne({ email: normalizedEmail });
@@ -41,7 +49,7 @@ const register = catchAsync(async (req, res) => {
     hospital: String(hospital || "").trim(),
     experience: Number(experience) || 0,
     profileImage: String(profileImage || "").trim(),
-    idDocument: String(idDocument || "").trim()
+    idDocument: String(idDocument || "").trim(),
   });
 
   const token = signToken(user);
@@ -50,14 +58,21 @@ const register = catchAsync(async (req, res) => {
     success: true,
     data: {
       token,
-      user: user.toJSON()
-    }
+      user: user.toJSON(),
+    },
   });
 });
 
 const login = catchAsync(async (req, res) => {
   const email = String(req.body.email).toLowerCase().trim();
   const password = String(req.body.password);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[auth] login request", {
+      email,
+      hasPassword: Boolean(password),
+    });
+  }
 
   const user = await User.findOne({ email }).select("+password");
   if (!user) {
@@ -76,12 +91,12 @@ const login = catchAsync(async (req, res) => {
     success: true,
     data: {
       token,
-      user: user.toJSON()
-    }
+      user: user.toJSON(),
+    },
   });
 });
 
 module.exports = {
   register,
-  login
+  login,
 };

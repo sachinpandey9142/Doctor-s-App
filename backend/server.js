@@ -6,17 +6,49 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const initializeSocket = require("./sockets/chatSocket");
 
-const PORT = Number(process.env.BACKEND_PORT || process.env.PORT || 8080);
+const isPortFree = (port) =>
+  new Promise((resolve) => {
+    const tester = http.createServer();
+
+    tester.unref();
+    tester.once("error", () => resolve(false));
+    tester.listen(port, () => {
+      tester.close(() => resolve(true));
+    });
+  });
+
+const resolvePort = async () => {
+  const preferredPort = Number(
+    process.env.BACKEND_PORT || process.env.PORT || 8080,
+  );
+
+  if (await isPortFree(preferredPort)) {
+    return preferredPort;
+  }
+
+  for (let port = preferredPort + 1; port < preferredPort + 21; port += 1) {
+    if (await isPortFree(port)) {
+      console.warn(`Port ${preferredPort} is busy. Falling back to ${port}.`);
+      return port;
+    }
+  }
+
+  throw new Error(
+    `No free port found in range ${preferredPort}-${preferredPort + 20}`,
+  );
+};
 
 const startServer = async () => {
   await connectDB();
+
+  const port = await resolvePort();
 
   const httpServer = http.createServer(app);
   const io = initializeSocket(httpServer);
   app.set("io", io);
 
-  httpServer.listen(PORT, () => {
-    console.log(`Doctor,s App backend running on http://localhost:${PORT}`);
+  httpServer.listen(port, () => {
+    console.log(`Doctor,s App backend running on http://localhost:${port}`);
   });
 };
 

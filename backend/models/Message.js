@@ -22,8 +22,15 @@ const messageSchema = new mongoose.Schema(
     mediaUrl: {
       type: String,
       default: ""
+    },
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+      }
+    ]
     }
-  },
+  ,
   {
     timestamps: true
   }

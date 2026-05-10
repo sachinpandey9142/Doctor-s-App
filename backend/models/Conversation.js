@@ -6,34 +6,53 @@ const conversationSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
-      }
+        required: true,
+      },
     ],
     participantsHash: {
       type: String,
       required: true,
       unique: true,
-      index: true
+      index: true,
     },
     isGroup: {
       type: Boolean,
-      default: false
+      default: false,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    admins: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    image: {
+      type: String,
+      default: "",
     },
     postId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Post"
+      ref: "Post",
     },
     title: {
-      type: String
+      type: String,
+    },
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {},
     },
     lastMessage: {
       type: String,
-      default: ""
-    }
+      default: "",
+    },
   },
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 conversationSchema.index({ updatedAt: -1 });

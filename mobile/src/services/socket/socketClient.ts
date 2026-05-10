@@ -33,7 +33,7 @@ export const connectSocket = (token: string): Socket => {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 8000
+    reconnectionDelayMax: 8000,
   });
 
   socket.on("reconnect", () => {
@@ -58,3 +58,5 @@ export interface ReceiveMessagePayload {
   conversationId: string;
   message: Message;
 }
+
+export type ConversationUpdatedPayload = import("@/types/models").Conversation;

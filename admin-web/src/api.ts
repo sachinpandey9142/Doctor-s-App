@@ -1,18 +1,30 @@
 import axios from "axios";
 import { useAdminStore } from "./store/adminStore";
 
-// Resolve base URL robustly:
-// - In Vite dev with proxy: use relative '/api' so Vite proxies requests.
-// - When running admin-web directly (no proxy) allow VITE_BACKEND_URL or BACKEND_PORT to point to backend.
-const viteBackendUrl = (import.meta as any).env?.VITE_BACKEND_URL;
-const envBackendPort = process.env.BACKEND_PORT || (import.meta as any).env?.VITE_BACKEND_PORT;
+const viteEnv = import.meta.env as ImportMetaEnv & {
+  VITE_BACKEND_URL?: string;
+  VITE_BACKEND_PORT?: string;
+};
+
+const viteBackendUrl = viteEnv.VITE_BACKEND_URL;
+const viteBackendPort = viteEnv.VITE_BACKEND_PORT;
+
+const normalizeBackendUrl = (value: string) => {
+  const trimmed = value.trim().replace(/\/+$/, "");
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `http://${trimmed}`;
+};
 
 let baseURL = "/api"; // default for dev proxy
 if (viteBackendUrl) {
-  baseURL = `${viteBackendUrl.replace(/\/$/, "")}/api`;
-} else if (envBackendPort && typeof window !== "undefined") {
+  baseURL = `${normalizeBackendUrl(viteBackendUrl)}/api`;
+} else if (viteBackendPort) {
   // running in browser without Vite proxy - point directly to backend
-  baseURL = `http://localhost:${envBackendPort}/api`;
+  baseURL = `http://localhost:${viteBackendPort}/api`;
 }
 
 const api = axios.create({
@@ -41,7 +53,7 @@ api.interceptors.response.use(
       useAdminStore.getState().logout();
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
