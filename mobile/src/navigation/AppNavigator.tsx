@@ -1,5 +1,5 @@
-import React from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import {
   NavigationContainer,
   DefaultTheme,
@@ -16,6 +16,13 @@ import {
   UserRound,
 } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 
 import { useAuthStore } from "@/store/authStore";
 import { useSocketChat } from "@/hooks/useSocketChat";
@@ -32,6 +39,7 @@ import { CreatePostScreen } from "@/screens/feed/CreatePostScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import { AddStoryScreen } from "@/screens/stories/AddStoryScreen";
 import { StoryViewerScreen } from "@/screens/stories/StoryViewerScreen";
+import { MemoryCollectionScreen } from "@/screens/memories/MemoryCollectionScreen";
 import { JobsScreen } from "@/screens/jobs/JobsScreen";
 import { ChatListScreen } from "@/screens/chat/ChatListScreen";
 import { ChatScreen } from "@/screens/chat/ChatScreen";
@@ -49,6 +57,73 @@ import { FollowersScreen } from "@/screens/profile/FollowersScreen";
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
+
+// ── Animated Tab Icon ─────────────────────────────────────────────────────────
+function AnimatedTabIcon({
+  focused,
+  Icon,
+  primaryColor,
+  tertiaryColor,
+}: {
+  focused: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Icon: React.ComponentType<any>;
+  primaryColor: string;
+  tertiaryColor: string;
+}) {
+  const scale = useSharedValue(1);
+  const translateY = useSharedValue(0);
+  const pillScale = useSharedValue(0);
+  const pillOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (focused) {
+      // Bounce on activation and float up slightly
+      scale.value = withSpring(1.2, { damping: 12, stiffness: 300, mass: 0.8 });
+      translateY.value = withSpring(-4, { damping: 12, stiffness: 300 });
+      // Pill fades in
+      pillScale.value = withSpring(1, { damping: 15, stiffness: 280 });
+      pillOpacity.value = withTiming(1, {
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+      });
+    } else {
+      scale.value = withTiming(1, { duration: 160 });
+      translateY.value = withTiming(0, { duration: 160 });
+      pillScale.value = withTiming(0, { duration: 180 });
+      pillOpacity.value = withTiming(0, { duration: 160 });
+    }
+  }, [focused, scale, translateY, pillScale, pillOpacity]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
+  }));
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: pillScale.value }],
+    opacity: pillOpacity.value,
+  }));
+
+  return (
+    <View style={tabStyles.iconWrap}>
+      {/* Active pill indicator */}
+      <Animated.View
+        style={[
+          tabStyles.activePill,
+          { backgroundColor: primaryColor + "18" },
+          pillStyle,
+        ]}
+      />
+      <Animated.View style={iconStyle}>
+        <Icon
+          color={focused ? primaryColor : tertiaryColor}
+          size={22}
+          strokeWidth={focused ? 2.5 : 1.8}
+        />
+      </Animated.View>
+    </View>
+  );
+}
 
 function AuthNavigator() {
   return (
@@ -73,90 +148,48 @@ function MainTabsNavigator() {
         tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarLabelStyle: {
           fontFamily: "Manrope_700Bold",
-          fontSize: 10,
+          fontSize: 9.5,
           marginTop: -2,
           marginBottom: Platform.OS === "ios" ? 0 : 2,
         },
         tabBarStyle: {
-          height: Platform.OS === "ios" ? 90 : 72,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 26 : 10,
-          borderTopWidth: 0,
+          height: Platform.OS === "ios" ? 88 : 70,
+          paddingTop: 7,
+          paddingBottom: Platform.OS === "ios" ? 24 : 9,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.borderLight,
           backgroundColor: theme.colors.surface,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.08,
+          shadowColor: "#0F172A",
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.07,
           shadowRadius: 16,
-          elevation: 16,
+          elevation: 12,
         },
         tabBarIcon: ({ focused }) => {
-          const iconSize = 22;
-          let Icon: React.ReactNode;
+          let Icon: React.ComponentType<any>;
           switch (route.name) {
             case "HomeFeed":
-              Icon = (
-                <House
-                  color={
-                    focused ? theme.colors.primary : theme.colors.textTertiary
-                  }
-                  size={iconSize}
-                  strokeWidth={focused ? 2.5 : 1.8}
-                />
-              );
+              Icon = House;
               break;
             case "CaseDiscussion":
-              Icon = (
-                <ClipboardPlus
-                  color={
-                    focused ? theme.colors.primary : theme.colors.textTertiary
-                  }
-                  size={iconSize}
-                  strokeWidth={focused ? 2.5 : 1.8}
-                />
-              );
+              Icon = ClipboardPlus;
               break;
             case "ChatList":
-              Icon = (
-                <MessageCircleMore
-                  color={
-                    focused ? theme.colors.primary : theme.colors.textTertiary
-                  }
-                  size={iconSize}
-                  strokeWidth={focused ? 2.5 : 1.8}
-                />
-              );
+              Icon = MessageCircleMore;
               break;
             case "Jobs":
-              Icon = (
-                <Briefcase
-                  color={
-                    focused ? theme.colors.primary : theme.colors.textTertiary
-                  }
-                  size={iconSize}
-                  strokeWidth={focused ? 2.5 : 1.8}
-                />
-              );
+              Icon = Briefcase;
               break;
             default:
-              Icon = (
-                <UserRound
-                  color={
-                    focused ? theme.colors.primary : theme.colors.textTertiary
-                  }
-                  size={iconSize}
-                  strokeWidth={focused ? 2.5 : 1.8}
-                />
-              );
+              Icon = UserRound;
           }
           return (
-            <View
-              style={[
-                tabStyles.iconWrap,
-                focused && { backgroundColor: theme.colors.primaryLight },
-              ]}
-            >
-              {Icon}
-            </View>
+            <AnimatedTabIcon
+              focused={focused}
+              Icon={Icon}
+              primaryColor={theme.colors.primary}
+              tertiaryColor={theme.colors.textTertiary}
+            />
           );
         },
       })}
@@ -192,11 +225,18 @@ function MainTabsNavigator() {
 
 const tabStyles = StyleSheet.create({
   iconWrap: {
-    width: 46,
-    height: 30,
-    borderRadius: 10,
+    width: 44,
+    height: 28,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  activePill: {
+    position: "absolute",
+    width: 44,
+    height: 28,
+    borderRadius: 14,
   },
 });
 
@@ -246,6 +286,11 @@ function MainStackNavigator() {
         name="StoryViewer"
         component={StoryViewerScreen}
         options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="MemoryCollection"
+        component={MemoryCollectionScreen}
+        options={{ title: "Memory" }}
       />
       <RootStack.Screen
         name="Discover"

@@ -156,6 +156,80 @@ export function SearchScreen() {
     }
   };
 
+  const renderItem = useCallback(({ item, index }: { item: User; index: number }) => {
+    const isFollowing = !!authUser?._id && item.followers.includes(authUser._id);
+    const followBusy = busyUserId === item._id;
+    const msgBusy = messageUserId === item._id;
+
+    return (
+      <Animated.View entering={FadeInDown.delay(Math.min(index * 35, 200)).duration(260).springify()}>
+        <Pressable
+          onPress={() => navigation.navigate("UserProfile", { userId: item._id })}
+          style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.cardBorder, ...theme.shadow.card }]}
+        >
+          {/* ── Profile row ───────────────────────────────── */}
+          <View style={styles.profileRow}>
+            <Avatar name={item.name} uri={item.profileImage} size={52} verified={item.isVerified} />
+
+            <View style={styles.profileText}>
+              <Text style={[styles.name, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[styles.role, { color: theme.colors.primary }]} numberOfLines={1}>
+                {item.role}{item.specialization ? ` · ${item.specialization}` : ""}
+              </Text>
+              {item.hospital ? (
+                <Text style={[styles.hospital, { color: theme.colors.textTertiary }]} numberOfLines={1}>
+                  {item.hospital}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* Inline follow chip on the right */}
+            <ActionChip
+              label={isFollowing ? "Following" : "Follow"}
+              onPress={() => void toggleFollow(item)}
+              loading={followBusy}
+              primary={!isFollowing}
+            />
+          </View>
+
+          {/* ── Stats row ────────────────────────────────── */}
+          <View style={[styles.statsRow, { borderTopColor: theme.colors.borderLight }]}>
+            <View style={styles.stat}>
+              <Text style={[styles.statVal, { color: theme.colors.textPrimary }]}>
+                {item.followers.length}
+              </Text>
+              <Text style={[styles.statKey, { color: theme.colors.textTertiary }]}>Followers</Text>
+            </View>
+
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />
+
+            <View style={styles.stat}>
+              <Text style={[styles.statVal, { color: theme.colors.textPrimary }]}>
+                {item.reputationScore ?? 0}
+              </Text>
+              <Text style={[styles.statKey, { color: theme.colors.textTertiary }]}>Reputation</Text>
+            </View>
+
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />
+
+            {/* Message button inside stats row */}
+            <Pressable
+              onPress={() => void openMessage(item)}
+              disabled={msgBusy}
+              style={styles.msgBtn}
+            >
+              <Text style={[styles.msgText, { color: theme.colors.primary }]}>
+                {msgBusy ? "Opening…" : "Message →"}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  }, [authUser?._id, busyUserId, messageUserId, navigation, openMessage, theme, toggleFollow]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* ── Search bar ──────────────────────────────────────────────── */}
@@ -194,79 +268,7 @@ export function SearchScreen() {
           data={visibleUsers}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item, index }) => {
-            const isFollowing = !!authUser?._id && item.followers.includes(authUser._id);
-            const followBusy = busyUserId === item._id;
-            const msgBusy = messageUserId === item._id;
-
-            return (
-              <Animated.View entering={FadeInDown.delay(index * 35).duration(260).springify()}>
-                <Pressable
-                  onPress={() => navigation.navigate("UserProfile", { userId: item._id })}
-                  style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.cardBorder }]}
-                >
-                  {/* ── Profile row ───────────────────────────────── */}
-                  <View style={styles.profileRow}>
-                    <Avatar name={item.name} uri={item.profileImage} size={52} verified={item.isVerified} />
-
-                    <View style={styles.profileText}>
-                      <Text style={[styles.name, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={[styles.role, { color: theme.colors.primary }]} numberOfLines={1}>
-                        {item.role}{item.specialization ? ` · ${item.specialization}` : ""}
-                      </Text>
-                      {item.hospital ? (
-                        <Text style={[styles.hospital, { color: theme.colors.textTertiary }]} numberOfLines={1}>
-                          {item.hospital}
-                        </Text>
-                      ) : null}
-                    </View>
-
-                    {/* Inline follow chip on the right */}
-                    <ActionChip
-                      label={isFollowing ? "Following" : "Follow"}
-                      onPress={() => void toggleFollow(item)}
-                      loading={followBusy}
-                      primary={!isFollowing}
-                    />
-                  </View>
-
-                  {/* ── Stats row ────────────────────────────────── */}
-                  <View style={[styles.statsRow, { borderTopColor: theme.colors.borderLight }]}>
-                    <View style={styles.stat}>
-                      <Text style={[styles.statVal, { color: theme.colors.textPrimary }]}>
-                        {item.followers.length}
-                      </Text>
-                      <Text style={[styles.statKey, { color: theme.colors.textTertiary }]}>Followers</Text>
-                    </View>
-
-                    <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />
-
-                    <View style={styles.stat}>
-                      <Text style={[styles.statVal, { color: theme.colors.textPrimary }]}>
-                        {item.reputationScore ?? 0}
-                      </Text>
-                      <Text style={[styles.statKey, { color: theme.colors.textTertiary }]}>Reputation</Text>
-                    </View>
-
-                    <View style={[styles.statDivider, { backgroundColor: theme.colors.borderLight }]} />
-
-                    {/* Message button inside stats row */}
-                    <Pressable
-                      onPress={() => void openMessage(item)}
-                      disabled={msgBusy}
-                      style={styles.msgBtn}
-                    >
-                      <Text style={[styles.msgText, { color: theme.colors.primary }]}>
-                        {msgBusy ? "Opening…" : "Message →"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </Pressable>
-              </Animated.View>
-            );
-          }}
+          renderItem={renderItem}
           ListEmptyComponent={
             <EmptyState
               icon={<UserSearch size={30} color={theme.colors.primary} />}
@@ -328,10 +330,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     overflow: "hidden",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
     elevation: 2
   },
   profileRow: {

@@ -23,6 +23,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { theme as AppTheme } from "@/constants/theme";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { getSocket } from "@/services/socket/socketClient";
 import { useAuthStore } from "@/store/authStore";
@@ -194,7 +195,7 @@ export function ChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: "#F0F4FF" }]}
+      style={[styles.container, { backgroundColor: theme.colors.backgroundAlt }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
@@ -278,7 +279,7 @@ export function ChatScreen() {
         <View
           style={[
             styles.inputWrap,
-            { backgroundColor: "#F1F5F9", borderColor: theme.colors.border },
+            { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border },
           ]}
         >
           <TextInput
@@ -307,7 +308,7 @@ export function ChatScreen() {
           <LinearGradient
             colors={
               canSend
-                ? ["#2563EB", "#06B6D4"]
+                ? AppTheme.gradients.primary
                 : [theme.colors.border, theme.colors.border]
             }
             start={{ x: 0, y: 0 }}
@@ -315,9 +316,9 @@ export function ChatScreen() {
             style={styles.sendBtn}
           >
             {sending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={theme.colors.textInverted} />
             ) : (
-              <SendHorizontal size={18} color="#FFFFFF" strokeWidth={2} />
+              <SendHorizontal size={18} color={theme.colors.textInverted} strokeWidth={2} />
             )}
           </LinearGradient>
         </Pressable>
@@ -339,7 +340,7 @@ const headerStyles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: "#10B981",
+    backgroundColor: AppTheme.colors.success,
   },
   statusText: { fontFamily: "Manrope_500Medium", fontSize: 11 },
   infoButton: {
@@ -367,10 +368,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginLeft: 10,
     marginBottom: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    ...AppTheme.shadow.card,
     elevation: 2,
   },
   typingDots: { flexDirection: "row", alignItems: "center" },
@@ -383,10 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
+    ...AppTheme.shadow.floating,
     elevation: 8,
   },
   attachBtn: {
@@ -420,10 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
+    ...AppTheme.shadow.floating,
     elevation: 8,
   },
 });

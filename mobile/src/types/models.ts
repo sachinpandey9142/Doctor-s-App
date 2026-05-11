@@ -11,6 +11,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  bio?: string;
   role: MedicalRole;
   specialization: string;
   hospital: string;
@@ -60,6 +61,30 @@ export interface StoryGroup {
   stories: Story[];
   latestStoryAt: string;
   hasUnseen: boolean;
+}
+
+export interface MemoryCollection {
+  _id: string;
+  userId: string;
+  title: string;
+  coverImage: string;
+  visibility: "followers" | "public" | "private";
+  createdAt: string;
+  updatedAt: string;
+  itemCount?: number;
+  latestItemAt?: string;
+}
+
+export interface MemoryItem {
+  _id: string;
+  collectionId: string;
+  storyId?: string | null;
+  mediaUrl: string;
+  mediaType: "image" | "video";
+  caption?: string;
+  sortOrder?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Comment {

@@ -79,7 +79,7 @@ export function JobsScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: Job; index: number }) => (
-      <Animated.View entering={FadeInDown.delay(index * 40).duration(280).springify()}>
+      <Animated.View entering={FadeInDown.delay(Math.min(index * 40, 200)).duration(280).springify()}>
         <JobCard job={item} onApply={handleApply} isApplied={!!currentUserId && item.applicants?.includes(currentUserId)} />
       </Animated.View>
     ),
@@ -100,10 +100,10 @@ export function JobsScreen() {
           </View>
 
           <Pressable
-            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+            style={[styles.addButton, { backgroundColor: theme.colors.primary, ...theme.shadow.floating }]}
             onPress={() => setShowModal(true)}
           >
-            <Plus size={18} color="#FFFFFF" />
+            <Plus size={18} color={theme.colors.textInverted} />
           </Pressable>
         </View>
 
@@ -133,7 +133,7 @@ export function JobsScreen() {
                 <Text
                   style={[
                     styles.filterText,
-                    { color: active ? "#FFFFFF" : theme.colors.textSecondary }
+                    { color: active ? theme.colors.textInverted : theme.colors.textSecondary }
                   ]}
                 >
                   {filterItem}
@@ -254,10 +254,6 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
     elevation: 4
   },
   filtersScroll: { paddingBottom: 10 },

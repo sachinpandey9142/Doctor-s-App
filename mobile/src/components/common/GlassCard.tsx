@@ -12,8 +12,14 @@ interface GlassCardProps {
   accent?: boolean;
 }
 
-export function GlassCard({ children, style, padded = true, accent = false }: GlassCardProps) {
+export function GlassCard({
+  children,
+  style,
+  padded = true,
+  accent = false,
+}: GlassCardProps) {
   const theme = useTheme();
+  const isDark = theme.colors.background !== "#F8FAFC";
 
   return (
     <View
@@ -21,14 +27,15 @@ export function GlassCard({ children, style, padded = true, accent = false }: Gl
         styles.container,
         {
           borderColor: theme.colors.cardBorder,
+          borderWidth: isDark ? 1 : 0,
           backgroundColor: theme.colors.surface,
-          shadowColor: "#0F172A",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          elevation: 3
+          shadowColor: isDark ? "#000000" : "#0F172A",
+          shadowOffset: { width: 0, height: isDark ? 8 : 4 },
+          shadowOpacity: isDark ? 0.32 : 0.08,
+          shadowRadius: isDark ? 24 : 12,
+          elevation: isDark ? 8 : 3,
         },
-        style
+        style,
       ]}
     >
       {accent ? (
@@ -46,15 +53,15 @@ export function GlassCard({ children, style, padded = true, accent = false }: Gl
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 18,
-    borderWidth: 1,
-    overflow: "hidden"
+    borderRadius: 22,
+    borderWidth: 0,
+    overflow: "hidden",
   },
   accentLine: {
-    height: 3,
-    width: "100%"
+    height: 2,
+    width: "100%",
   },
   content: {
-    padding: 16
-  }
+    padding: 14,
+  },
 });

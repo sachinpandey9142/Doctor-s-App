@@ -8,10 +8,13 @@ import { useTheme } from "styled-components/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { theme } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/types";
 import { useNotificationStore } from "@/store/notificationStore";
 import type { NotificationItem } from "@/types/models";
 import { formatRelativeTime } from "@/utils/date";
+
+const baseShadow = theme.shadow;
 
 function isToday(dateStr: string) {
   const d = new Date(dateStr);
@@ -32,7 +35,7 @@ export function NotificationsScreen() {
     switch (type) {
       case "like": return <Heart size={size} color={theme.colors.error} fill={theme.colors.error} />;
       case "comment": return <MessageCircle size={size} color={theme.colors.primary} />;
-      case "job": return <Briefcase size={size} color="#D97706" />;
+      case "job": return <Briefcase size={size} color={theme.colors.warning} />;
       case "follow": return <UserPlus2 size={size} color={theme.colors.teal} />;
       default: return <Bell size={size} color={theme.colors.primary} />;
     }
@@ -42,7 +45,7 @@ export function NotificationsScreen() {
     switch (type) {
       case "like": return theme.colors.errorLight;
       case "comment": return theme.colors.primaryLight;
-      case "job": return "#FEF3C7";
+      case "job": return theme.colors.warningLight;
       case "follow": return theme.colors.tealLight;
       default: return theme.colors.primaryLight;
     }
@@ -52,7 +55,7 @@ export function NotificationsScreen() {
     switch (type) {
       case "like": return theme.colors.error;
       case "comment": return theme.colors.primary;
-      case "job": return "#D97706";
+      case "job": return theme.colors.warning;
       case "follow": return theme.colors.teal;
       default: return theme.colors.primary;
     }
@@ -102,7 +105,7 @@ export function NotificationsScreen() {
   }, [notifications]);
 
   const renderItem = useCallback(({ item, index }: { item: NotificationItem; index: number }) => (
-    <Animated.View entering={FadeInDown.delay(index * 30).duration(240).springify()}>
+    <Animated.View entering={FadeInDown.delay(Math.min(index * 30, 200)).duration(240).springify()}>
       <Pressable
         onPress={() => void openNotification(item)}
         style={({ pressed }) => [
@@ -227,7 +230,7 @@ const styles = StyleSheet.create({
     minWidth: 22, height: 22, borderRadius: 11,
     alignItems: "center", justifyContent: "center", paddingHorizontal: 5
   },
-  badgeText: { fontFamily: "Manrope_700Bold", fontSize: 11, color: "#FFFFFF" },
+  badgeText: { fontFamily: "Manrope_700Bold", fontSize: 11, color: theme.colors.textInverted },
   subtitle: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13 },
   markAllBtn: {
     flexDirection: "row",
@@ -258,11 +261,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     overflow: "hidden",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...baseShadow.card,
     position: "relative"
   },
   unreadBar: {

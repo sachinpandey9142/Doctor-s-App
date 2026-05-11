@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -14,6 +14,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageCircle, Plus, Search, X } from "lucide-react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+
+import { theme } from "@/constants/theme";
+const baseShadow = theme.shadow;
 
 import { Avatar } from "@/components/common/Avatar";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -73,6 +76,107 @@ export function ChatListScreen() {
     0,
   );
 
+  const renderItem = useCallback(
+    ({
+      item,
+      index,
+    }: {
+      item: Conversation & { peer?: User };
+      index: number;
+    }) => {
+      const unread: number = (item as any).unreadCount || 0;
+      const name = item.isGroup
+        ? item.title || "Case Discussion"
+        : item.peer?.name || "Medical Professional";
+      return (
+        <Animated.View
+          entering={FadeInDown.delay(Math.min(index * 35, 200))
+            .duration(260)
+            .springify()}
+        >
+          <Pressable
+            onPress={() => openConversation(item)}
+            style={({ pressed }) => [
+              styles.row,
+              {
+                backgroundColor: pressed
+                  ? theme.colors.primaryLight
+                  : theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Avatar
+              name={name}
+              uri={item.isGroup ? "" : item.peer?.profileImage}
+              verified={!item.isGroup && item.peer?.isVerified}
+              size={48}
+            />
+            <View style={styles.messageWrap}>
+              <View style={styles.rowBetween}>
+                <Text
+                  style={[
+                    styles.name,
+                    {
+                      color:
+                        unread > 0
+                          ? theme.colors.textPrimary
+                          : theme.colors.textPrimary,
+                    },
+                    unread > 0 && styles.nameUnread,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {name}
+                </Text>
+                <Text
+                  style={[styles.time, { color: theme.colors.textTertiary }]}
+                >
+                  {formatRelativeTime(item.updatedAt)}
+                </Text>
+              </View>
+              <View style={styles.previewRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.preview,
+                    {
+                      color:
+                        unread > 0
+                          ? theme.colors.textPrimary
+                          : theme.colors.textSecondary,
+                    },
+                    unread > 0 && styles.previewUnread,
+                  ]}
+                >
+                  {item.lastMessage || "Tap to start the conversation"}
+                </Text>
+                {unread > 0 ? (
+                  <View
+                    style={[
+                      styles.unreadBadge,
+                      { backgroundColor: theme.colors.primary },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.unreadBadgeText,
+                        { color: theme.colors.textInverted },
+                      ]}
+                    >
+                      {unread > 99 ? "99+" : unread}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </Pressable>
+        </Animated.View>
+      );
+    },
+    [openConversation, theme],
+  );
+
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -114,8 +218,19 @@ export function ChatListScreen() {
               },
             ]}
           >
-            <Plus size={16} color="#FFFFFF" strokeWidth={2.4} />
-            <Text style={styles.newGroupText}>New Group</Text>
+            <Plus
+              size={16}
+              color={theme.colors.textInverted}
+              strokeWidth={2.4}
+            />
+            <Text
+              style={[
+                styles.newGroupText,
+                { color: theme.colors.textInverted },
+              ]}
+            >
+              New Group
+            </Text>
           </Pressable>
         </View>
 
@@ -150,95 +265,7 @@ export function ChatListScreen() {
         data={filtered}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => {
-          const unread: number = (item as any).unreadCount || 0;
-          const name = item.isGroup
-            ? item.title || "Case Discussion"
-            : item.peer?.name || "Medical Professional";
-          return (
-            <Animated.View
-              entering={FadeInDown.delay(index * 35)
-                .duration(260)
-                .springify()}
-            >
-              <Pressable
-                onPress={() => openConversation(item)}
-                style={({ pressed }) => [
-                  styles.row,
-                  {
-                    backgroundColor: pressed
-                      ? theme.colors.primaryLight
-                      : theme.colors.surface,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-              >
-                <Avatar
-                  name={name}
-                  uri={item.isGroup ? "" : item.peer?.profileImage}
-                  verified={!item.isGroup && item.peer?.isVerified}
-                  size={48}
-                />
-                <View style={styles.messageWrap}>
-                  <View style={styles.rowBetween}>
-                    <Text
-                      style={[
-                        styles.name,
-                        {
-                          color:
-                            unread > 0
-                              ? theme.colors.textPrimary
-                              : theme.colors.textPrimary,
-                        },
-                        unread > 0 && styles.nameUnread,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.time,
-                        { color: theme.colors.textTertiary },
-                      ]}
-                    >
-                      {formatRelativeTime(item.updatedAt)}
-                    </Text>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.preview,
-                        {
-                          color:
-                            unread > 0
-                              ? theme.colors.textPrimary
-                              : theme.colors.textSecondary,
-                        },
-                        unread > 0 && styles.previewUnread,
-                      ]}
-                    >
-                      {item.lastMessage || "Tap to start the conversation"}
-                    </Text>
-                    {unread > 0 ? (
-                      <View
-                        style={[
-                          styles.unreadBadge,
-                          { backgroundColor: theme.colors.primary },
-                        ]}
-                      >
-                        <Text style={styles.unreadBadgeText}>
-                          {unread > 99 ? "99+" : unread}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              </Pressable>
-            </Animated.View>
-          );
-        }}
+        renderItem={renderItem}
         ListEmptyComponent={
           <EmptyState
             icon={<MessageCircle size={30} color={theme.colors.primary} />}
@@ -290,7 +317,6 @@ const styles = StyleSheet.create({
   newGroupText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 12,
-    color: "#FFFFFF",
   },
   searchBar: {
     flexDirection: "row",
@@ -323,10 +349,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     marginBottom: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
+    ...baseShadow.card,
     elevation: 1,
   },
   messageWrap: { flex: 1 },
@@ -368,6 +391,5 @@ const styles = StyleSheet.create({
   unreadBadgeText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 10,
-    color: "#FFFFFF",
   },
 });

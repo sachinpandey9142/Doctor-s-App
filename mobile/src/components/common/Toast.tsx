@@ -1,70 +1,75 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  FadeIn,
-  FadeOut,
   Layout,
   SlideInUp,
-  SlideOutUp
+  SlideOutUp,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react-native";
+import { useTheme } from "styled-components/native";
 
 import { useToastStore, type ToastMessage, type ToastType } from "@/store/toastStore";
 
-/* ─── Colour tokens per type ─────────────────────────────── */
-const TOKEN: Record<
-  ToastType,
-  { bg: string; border: string; icon: string; label: string }
-> = {
-  error: {
-    bg: "#FEF2F2",
-    border: "#EF4444",
-    icon: "#EF4444",
-    label: "Error"
-  },
-  success: {
-    bg: "#F0FDF4",
-    border: "#22C55E",
-    icon: "#22C55E",
-    label: "Success"
-  },
-  info: {
-    bg: "#EFF6FF",
-    border: "#2563EB",
-    icon: "#2563EB",
-    label: "Info"
+/* ─── Colour tokens per type (theme-aware) ─────────────────────────── */
+function getToken(
+  type: ToastType,
+  isDark: boolean,
+): { bg: string; border: string; icon: string } {
+  if (isDark) {
+    // Dark mode: deeper tinted surfaces, soft borders
+    const dark: Record<ToastType, { bg: string; border: string; icon: string }> = {
+      error:   { bg: "#2D1515", border: "#F87171", icon: "#F87171" },
+      success: { bg: "#0D2318", border: "#4ADE80", icon: "#4ADE80" },
+      info:    { bg: "#0D1E3B", border: "#60A5FA", icon: "#60A5FA" },
+    };
+    return dark[type];
   }
-};
+  // Light mode: soft tinted backgrounds
+  const light: Record<ToastType, { bg: string; border: string; icon: string }> = {
+    error:   { bg: "#FEF2F2", border: "#EF4444", icon: "#EF4444" },
+    success: { bg: "#F0FDF4", border: "#22C55E", icon: "#22C55E" },
+    info:    { bg: "#EFF6FF", border: "#2563EB", icon: "#2563EB" },
+  };
+  return light[type];
+}
 
-function ToastIcon({ type }: { type: ToastType }) {
-  const color = TOKEN[type].icon;
+function ToastIcon({ type, color }: { type: ToastType; color: string }) {
   const size = 18;
-
   switch (type) {
-    case "error":
-      return <AlertCircle size={size} color={color} />;
-    case "success":
-      return <CheckCircle size={size} color={color} />;
-    default:
-      return <Info size={size} color={color} />;
+    case "error":   return <AlertCircle size={size} color={color} />;
+    case "success": return <CheckCircle size={size} color={color} />;
+    default:        return <Info size={size} color={color} />;
   }
 }
 
 function SingleToast({ toast }: { toast: ToastMessage }) {
   const dismiss = useToastStore((s) => s.dismissToast);
-  const t = TOKEN[toast.type];
+  const theme = useTheme();
+  // Detect dark mode by checking if background is dark
+  const isDark = theme.colors.background === "#0B1120" || theme.colors.surface === "#111827";
+  const t = getToken(toast.type, isDark);
 
   return (
     <Animated.View
       entering={SlideInUp.springify().damping(18).stiffness(200)}
       exiting={SlideOutUp.duration(200)}
       layout={Layout.springify()}
-      style={[styles.toast, { backgroundColor: t.bg, borderColor: t.border }]}
+      style={[
+        styles.toast,
+        {
+          backgroundColor: t.bg,
+          borderColor: t.border,
+          shadowColor: isDark ? "#000" : "#0F172A",
+        },
+      ]}
     >
-      <ToastIcon type={toast.type} />
+      <ToastIcon type={toast.type} color={t.icon} />
 
-      <Text style={[styles.message, { color: "#0F172A" }]} numberOfLines={3}>
+      <Text
+        style={[styles.message, { color: theme.colors.textPrimary }]}
+        numberOfLines={3}
+      >
         {toast.message}
       </Text>
 
@@ -73,7 +78,7 @@ function SingleToast({ toast }: { toast: ToastMessage }) {
         onPress={() => dismiss(toast.id)}
         style={styles.closeButton}
       >
-        <X size={14} color="#64748B" />
+        <X size={14} color={theme.colors.textTertiary} />
       </Pressable>
     </Animated.View>
   );
@@ -87,16 +92,11 @@ export function Toast() {
   const toasts = useToastStore((s) => s.toasts);
   const insets = useSafeAreaInsets();
 
-  if (toasts.length === 0) {
-    return null;
-  }
+  if (toasts.length === 0) return null;
 
   return (
     <View
-      style={[
-        styles.container,
-        { top: insets.top + 8, paddingHorizontal: 16 }
-      ]}
+      style={[styles.container, { top: insets.top + 8, paddingHorizontal: 16 }]}
       pointerEvents="box-none"
     >
       {toasts.map((toast) => (
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 9999,
-    gap: 8
+    gap: 8,
   },
   toast: {
     flexDirection: "row",
@@ -122,21 +122,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    // Subtle card shadow
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 6
+    elevation: 6,
   },
   message: {
     flex: 1,
     fontFamily: "Manrope_500Medium",
     fontSize: 13,
-    lineHeight: 19
+    lineHeight: 19,
   },
   closeButton: {
     alignItems: "center",
-    justifyContent: "center"
-  }
+    justifyContent: "center",
+  },
 });

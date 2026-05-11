@@ -8,7 +8,9 @@ import { ThemeProvider } from "styled-components/native";
 import * as SplashScreen from "expo-splash-screen";
 import {
   useFonts,
+  Manrope_400Regular,
   Manrope_500Medium,
+  Manrope_600SemiBold,
   Manrope_700Bold
 } from "@expo-google-fonts/manrope";
 import {
@@ -32,7 +34,9 @@ export default function App() {
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
 
   const [fontsLoaded] = useFonts({
+    Manrope_400Regular,
     Manrope_500Medium,
+    Manrope_600SemiBold,
     Manrope_700Bold,
     SpaceGrotesk_400Regular,
     SpaceGrotesk_700Bold

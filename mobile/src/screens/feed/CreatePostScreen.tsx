@@ -158,7 +158,7 @@ export function CreatePostScreen() {
                   active && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
                 ]}
               >
-                <Text style={[styles.tabText, active && { color: "#FFFFFF" }, !active && { color: theme.colors.textSecondary }]}>
+                <Text style={[styles.tabText, active && { color: theme.colors.textInverted }, !active && { color: theme.colors.textSecondary }]}>
                   {tag.charAt(0).toUpperCase() + tag.slice(1)}
                 </Text>
               </Pressable>
@@ -166,7 +166,7 @@ export function CreatePostScreen() {
           })}
         </View>
 
-        <GlassCard padded={false} style={styles.card}>
+        <GlassCard padded={false} style={[styles.card, { borderColor: theme.colors.border }]}>
           <TextInput
             value={content}
             onChangeText={setContent}
@@ -213,8 +213,8 @@ export function CreatePostScreen() {
               )}
               {uploading && (
                 <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="large" color="#FFFFFF" />
-                  <Text style={styles.uploadingText}>Uploading to cloud...</Text>
+                  <ActivityIndicator size="large" color={theme.colors.textInverted} />
+                  <Text style={[styles.uploadingText, { color: theme.colors.textInverted }]}>Uploading to cloud...</Text>
                 </View>
               )}
             </View>
@@ -279,16 +279,16 @@ export function CreatePostScreen() {
             colors={
               (!canSubmit || uploading || (!!localMediaUri && !uploadedMediaUrl) || loading)
                 ? [theme.colors.border, theme.colors.border]
-                : [theme.colors.primary, "#6366F1"] 
+                : theme.gradients.primary
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.publishGradient}
           >
             {loading || uploading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={theme.colors.textInverted} />
             ) : (
-              <Text style={styles.publishText}>Publish Post</Text>
+              <Text style={[styles.publishText, { color: theme.colors.textInverted }]}>Publish Post</Text>
             )}
           </LinearGradient>
         </AnimatedPressable>
@@ -302,11 +302,12 @@ const styles = StyleSheet.create({
   contentContainer: { padding: 16, paddingBottom: 110 },
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.04)",
+    backgroundColor: "transparent",
     borderRadius: 18,
     padding: 4,
     marginBottom: 16,
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    borderWidth: 1,
   },
   tabChip: {
     flex: 1,
@@ -428,10 +429,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 34 : 16,
     borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
     elevation: 12
   },
   publishBtnWrapper: {

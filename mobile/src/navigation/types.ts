@@ -24,6 +24,11 @@ export type RootStackParamList = {
     userId: string;
     storyId?: string;
   };
+  MemoryCollection: {
+    collectionId: string;
+    title?: string;
+    userId?: string;
+  };
   Discover: undefined;
   Followers: {
     userId: string;

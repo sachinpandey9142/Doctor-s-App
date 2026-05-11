@@ -4,9 +4,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  type ViewStyle
+  type ViewStyle,
 } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 
@@ -34,21 +38,21 @@ export function AnimatedButton({
   loading = false,
   disabled = false,
   style,
-  icon
+  icon,
 }: AnimatedButtonProps) {
   const theme = useTheme();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }]
+    transform: [{ scale: scale.value }],
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 16, stiffness: 340 });
+    scale.value = withSpring(0.96, { damping: 15, stiffness: 280, mass: 0.8 });
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 16, stiffness: 340 });
+    scale.value = withSpring(1, { damping: 14, stiffness: 240, mass: 0.8 });
   };
 
   const isDisabled = disabled || loading;
@@ -57,7 +61,10 @@ export function AnimatedButton({
   if (variant === "primary") {
     return (
       <AnimatedPressable
-        onPress={() => { hapticMedium(); onPress(); }}
+        onPress={() => {
+          hapticMedium();
+          onPress();
+        }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -67,7 +74,11 @@ export function AnimatedButton({
           colors={theme.gradients.primary}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.base, theme.shadow.floating, isDisabled && styles.disabled]}
+          style={[
+            styles.base,
+            theme.shadow.floating,
+            isDisabled && styles.disabled,
+          ]}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -86,7 +97,10 @@ export function AnimatedButton({
   if (variant === "secondary") {
     return (
       <AnimatedPressable
-        onPress={() => { hapticTap(); onPress(); }}
+        onPress={() => {
+          hapticTap();
+          onPress();
+        }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -95,8 +109,12 @@ export function AnimatedButton({
         <Animated.View
           style={[
             styles.base,
-            { backgroundColor: theme.colors.primaryLight, borderWidth: 1, borderColor: theme.colors.primaryMid },
-            isDisabled && styles.disabled
+            {
+              backgroundColor: theme.colors.primaryLight,
+              borderWidth: 1,
+              borderColor: theme.colors.primaryMid,
+            },
+            isDisabled && styles.disabled,
           ]}
         >
           {loading ? (
@@ -104,7 +122,11 @@ export function AnimatedButton({
           ) : (
             <>
               {icon}
-              <Text style={[styles.secondaryLabel, { color: theme.colors.primary }]}>{title}</Text>
+              <Text
+                style={[styles.secondaryLabel, { color: theme.colors.primary }]}
+              >
+                {title}
+              </Text>
             </>
           )}
         </Animated.View>
@@ -116,7 +138,10 @@ export function AnimatedButton({
   if (variant === "danger") {
     return (
       <AnimatedPressable
-        onPress={() => { hapticTap(); onPress(); }}
+        onPress={() => {
+          hapticTap();
+          onPress();
+        }}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -125,8 +150,12 @@ export function AnimatedButton({
         <Animated.View
           style={[
             styles.base,
-            { backgroundColor: theme.colors.errorLight, borderWidth: 1, borderColor: "#FCA5A5" },
-            isDisabled && styles.disabled
+            {
+              backgroundColor: theme.colors.errorLight,
+              borderWidth: 1,
+              borderColor: theme.colors.error + "60",
+            },
+            isDisabled && styles.disabled,
           ]}
         >
           {loading ? (
@@ -134,7 +163,11 @@ export function AnimatedButton({
           ) : (
             <>
               {icon}
-              <Text style={[styles.secondaryLabel, { color: theme.colors.error }]}>{title}</Text>
+              <Text
+                style={[styles.secondaryLabel, { color: theme.colors.error }]}
+              >
+                {title}
+              </Text>
             </>
           )}
         </Animated.View>
@@ -145,7 +178,10 @@ export function AnimatedButton({
   // ── Ghost: transparent with border ─────────────────────────────────────────
   return (
     <AnimatedPressable
-      onPress={() => { hapticTap(); onPress(); }}
+      onPress={() => {
+        hapticTap();
+        onPress();
+      }}
       disabled={isDisabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -154,8 +190,12 @@ export function AnimatedButton({
       <Animated.View
         style={[
           styles.base,
-          { backgroundColor: "transparent", borderWidth: 1, borderColor: theme.colors.border },
-          isDisabled && styles.disabled
+          {
+            backgroundColor: "transparent",
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          },
+          isDisabled && styles.disabled,
         ]}
       >
         {loading ? (
@@ -163,7 +203,11 @@ export function AnimatedButton({
         ) : (
           <>
             {icon}
-            <Text style={[styles.ghostLabel, { color: theme.colors.textSecondary }]}>{title}</Text>
+            <Text
+              style={[styles.ghostLabel, { color: theme.colors.textSecondary }]}
+            >
+              {title}
+            </Text>
           </>
         )}
       </Animated.View>
@@ -173,31 +217,31 @@ export function AnimatedButton({
 
 const styles = StyleSheet.create({
   base: {
-    height: 48,
-    borderRadius: 14,
+    height: 44,
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 18
+    paddingHorizontal: 18,
   },
   primaryLabel: {
     color: "#FFFFFF",
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.2
+    letterSpacing: 0.2,
   },
   secondaryLabel: {
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.1
+    letterSpacing: 0.1,
   },
   ghostLabel: {
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    letterSpacing: 0.1
+    letterSpacing: 0.1,
   },
   disabled: {
-    opacity: 0.45
-  }
+    opacity: 0.5,
+  },
 });

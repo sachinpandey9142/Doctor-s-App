@@ -9,6 +9,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "styled-components/native";
 
 interface LoadingSkeletonProps {
   height?: number;
@@ -17,6 +18,7 @@ interface LoadingSkeletonProps {
 }
 
 export function LoadingSkeleton({ height = 14, width = "100%", borderRadius = 10 }: LoadingSkeletonProps) {
+  const theme = useTheme();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -38,6 +40,11 @@ export function LoadingSkeleton({ height = 14, width = "100%", borderRadius = 10
     ]
   }));
 
+  const isDark = theme.colors.background !== "#F8FAFC";
+  const shimmerColors = isDark
+    ? ["rgba(255,255,255,0)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)"]
+    : ["rgba(255,255,255,0)", "rgba(255,255,255,0.85)", "rgba(255,255,255,0)"];
+
   return (
     <View
       style={[
@@ -45,17 +52,14 @@ export function LoadingSkeleton({ height = 14, width = "100%", borderRadius = 10
         {
           height,
           width,
-          borderRadius
+          borderRadius,
+          backgroundColor: theme.colors.borderLight,
         }
       ]}
     >
       <Animated.View style={[styles.shimmer, shimmerStyle]}>
         <LinearGradient
-          colors={[
-            "rgba(255,255,255,0)",
-            "rgba(255,255,255,0.85)",
-            "rgba(255,255,255,0)"
-          ]}
+          colors={shimmerColors as [string, string, string]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.gradient}
@@ -67,8 +71,7 @@ export function LoadingSkeleton({ height = 14, width = "100%", borderRadius = 10
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#E2E8F0",
-    overflow: "hidden"
+    overflow: "hidden",
   },
   shimmer: {
     ...StyleSheet.absoluteFillObject,

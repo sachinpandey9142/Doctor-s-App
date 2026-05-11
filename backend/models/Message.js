@@ -6,34 +6,33 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Conversation",
       required: true,
-      index: true
+      index: true,
     },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
     text: {
       type: String,
       default: "",
       trim: true,
-      maxlength: 3000
+      maxlength: 3000,
     },
     mediaUrl: {
       type: String,
-      default: ""
+      default: "",
     },
     readBy: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-      }
-    ]
-    }
-  ,
+        ref: "User",
+      },
+    ],
+  },
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 messageSchema.index({ createdAt: -1 });

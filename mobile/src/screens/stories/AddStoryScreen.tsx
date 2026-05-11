@@ -121,9 +121,9 @@ export function AddStoryScreen() {
   ) : (
     <View style={[styles.placeholder, { backgroundColor: theme.colors.backgroundAlt }]}>
       <Pressable style={styles.pickButton} onPress={pickMedia}>
-        <LinearGradient colors={["#2563EB", "#06B6D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickGradient}>
-          {uploading ? <ActivityIndicator color="#FFFFFF" /> : <Camera size={22} color="#FFFFFF" />}
-          <Text style={styles.pickText}>{uploading ? "Uploading media" : "Choose photo or video"}</Text>
+        <LinearGradient colors={theme.gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickGradient}>
+          {uploading ? <ActivityIndicator color={theme.colors.textInverted} /> : <Camera size={22} color={theme.colors.textInverted} />}
+          <Text style={[styles.pickText, { color: theme.colors.textInverted }]}>{uploading ? "Uploading media" : "Choose photo or video"}</Text>
         </LinearGradient>
       </Pressable>
     </View>
@@ -135,12 +135,12 @@ export function AddStoryScreen() {
         <View style={styles.previewShell}>{preview}</View>
 
         <View style={[styles.topBar, { paddingTop: 16 }]}>
-          <Pressable onPress={() => navigation.goBack()} style={[styles.iconButton, { backgroundColor: "rgba(15,23,42,0.32)" }]}>
-            <ArrowLeft size={20} color="#FFFFFF" />
+          <Pressable onPress={() => navigation.goBack()} style={[styles.iconButton, { backgroundColor: "rgba(0,0,0,0.4)" }]}>
+            <ArrowLeft size={20} color={theme.colors.textInverted} />
           </Pressable>
         </View>
 
-        <View style={styles.bottomSheet}>
+        <View style={[styles.bottomSheet, { backgroundColor: theme.colors.surfaceElevated }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Add story</Text>
             <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -152,15 +152,15 @@ export function AddStoryScreen() {
                 onPress={() => setVisibility("followers")}
                 style={[styles.segment, visibility === "followers" && { backgroundColor: theme.colors.primary }]}
               >
-                <Eye size={15} color={visibility === "followers" ? "#FFFFFF" : theme.colors.textSecondary} />
-                <Text style={[styles.segmentText, { color: visibility === "followers" ? "#FFFFFF" : theme.colors.textSecondary }]}>Followers</Text>
+                <Eye size={15} color={visibility === "followers" ? theme.colors.textInverted : theme.colors.textSecondary} />
+                <Text style={[styles.segmentText, { color: visibility === "followers" ? theme.colors.textInverted : theme.colors.textSecondary }]}>Followers</Text>
               </Pressable>
               <Pressable
                 onPress={() => setVisibility("public")}
                 style={[styles.segment, visibility === "public" && { backgroundColor: theme.colors.primary }]}
               >
-                <Globe size={15} color={visibility === "public" ? "#FFFFFF" : theme.colors.textSecondary} />
-                <Text style={[styles.segmentText, { color: visibility === "public" ? "#FFFFFF" : theme.colors.textSecondary }]}>Public</Text>
+                <Globe size={15} color={visibility === "public" ? theme.colors.textInverted : theme.colors.textSecondary} />
+                <Text style={[styles.segmentText, { color: visibility === "public" ? theme.colors.textInverted : theme.colors.textSecondary }]}>Public</Text>
               </Pressable>
             </View>
 
@@ -185,17 +185,17 @@ export function AddStoryScreen() {
 
           <Pressable disabled={!canSubmit} onPress={submitStory} style={({ pressed }) => [styles.publishWrap, { opacity: pressed || !canSubmit ? 0.9 : 1 }]}>
             <LinearGradient
-              colors={canSubmit ? [theme.colors.primary, "#06B6D4"] : [theme.colors.border, theme.colors.border]}
+              colors={canSubmit ? theme.gradients.primary : [theme.colors.border, theme.colors.border]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.publishButton}
             >
               {publishing ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={theme.colors.textInverted} />
               ) : (
                 <>
-                  <Check size={18} color="#FFFFFF" />
-                  <Text style={styles.publishText}>Post story</Text>
+                  <Check size={18} color={theme.colors.textInverted} />
+                  <Text style={[styles.publishText, { color: theme.colors.textInverted }]}>Post story</Text>
                 </>
               )}
             </LinearGradient>
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   previewShell: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#020617"
+    backgroundColor: "#000000"
   },
   previewMedia: {
     width: "100%",
@@ -254,7 +254,6 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     marginTop: "auto",
-    backgroundColor: "rgba(255,255,255,0.94)",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 12,

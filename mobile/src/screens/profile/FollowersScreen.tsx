@@ -150,7 +150,7 @@ const RelationCard = React.memo(function RelationCard({
           {
             backgroundColor: theme.colors.surface,
             borderColor: theme.colors.cardBorder,
-            shadowColor: "#0F172A",
+            ...theme.shadow.card,
           },
         ]}
       >
@@ -208,12 +208,12 @@ const RelationCard = React.memo(function RelationCard({
           >
             <UserPlus
               size={14}
-              color={isFollowing ? theme.colors.primary : "#FFFFFF"}
+              color={isFollowing ? theme.colors.primary : theme.colors.textInverted}
             />
             <Text
               style={[
                 styles.primaryBtnText,
-                { color: isFollowing ? theme.colors.primary : "#FFFFFF" },
+                { color: isFollowing ? theme.colors.primary : theme.colors.textInverted },
               ]}
             >
               {isFollowing ? "Following" : "Follow Back"}

@@ -45,7 +45,7 @@ function SettingRow({ icon, iconBg, title, subtitle, rightElement, onPress, dang
         {icon}
       </View>
       <View style={styles.rowBody}>
-        <Text style={[styles.rowTitle, { color: danger ? "#EF4444" : theme.colors.textPrimary }]}>
+        <Text style={[styles.rowTitle, { color: danger ? theme.colors.error : theme.colors.textPrimary }]}>
           {title}
         </Text>
         {subtitle ? (
@@ -111,15 +111,15 @@ export function SettingsScreen() {
         <SectionHeader title="PROFILE" />
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <SettingRow
-            icon={<User size={16} color="#2563EB" strokeWidth={2} />}
-            iconBg="#EFF6FF"
+            icon={<User size={16} color={theme.colors.primary} strokeWidth={2} />}
+            iconBg={theme.colors.primaryLight}
             title="Edit Profile"
             subtitle="Update your name, photo and specialization"
             onPress={() => navigation.navigate("Profile" as never)}
           />
           <SettingRow
-            icon={<Info size={16} color="#7C3AED" strokeWidth={2} />}
-            iconBg="#F5F3FF"
+            icon={<Info size={16} color={theme.colors.badgeCase} strokeWidth={2} />}
+            iconBg={theme.colors.badgeCaseLight}
             title="About Me"
             subtitle="Hospital, experience, bio"
             onPress={() => navigation.navigate("Profile" as never)}
@@ -130,8 +130,8 @@ export function SettingsScreen() {
         <SectionHeader title="PRIVACY" />
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <SettingRow
-            icon={<Lock size={16} color="#0891B2" strokeWidth={2} />}
-            iconBg="#ECFEFF"
+            icon={<Lock size={16} color={theme.colors.teal} strokeWidth={2} />}
+            iconBg={theme.colors.tealLight}
             title="Who can message me"
             subtitle="Everyone"
             onPress={() => {}}
@@ -142,8 +142,8 @@ export function SettingsScreen() {
         <SectionHeader title="NOTIFICATIONS" />
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <SettingRow
-            icon={<Bell size={16} color="#D97706" strokeWidth={2} />}
-            iconBg="#FFFBEB"
+            icon={<Bell size={16} color={theme.colors.warning} strokeWidth={2} />}
+            iconBg={theme.colors.warningLight}
             title="Push Notifications"
             subtitle="Likes, comments, follows, jobs"
             rightElement={
@@ -161,8 +161,8 @@ export function SettingsScreen() {
         <SectionHeader title="APPEARANCE" />
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <SettingRow
-            icon={<MoonStar size={16} color="#1E3A8A" strokeWidth={2} />}
-            iconBg="#EFF6FF"
+            icon={<MoonStar size={16} color={theme.colors.primary} strokeWidth={2} />}
+            iconBg={theme.colors.primaryLight}
             title="Dark Mode"
             subtitle="Apply a dark theme across the app"
             rightElement={
@@ -170,7 +170,7 @@ export function SettingsScreen() {
                 value={isDarkMode}
                 onValueChange={(v) => { void handleDarkMode(v); }}
                 trackColor={{ false: theme.colors.border, true: theme.colors.primaryMid }}
-                thumbColor={isDarkMode ? theme.colors.surface : "#F8FAFC"}
+                thumbColor={isDarkMode ? theme.colors.primary : theme.colors.textTertiary}
               />
             }
           />
@@ -178,10 +178,10 @@ export function SettingsScreen() {
 
         {/* Logout */}
         <SectionHeader title="ACCOUNT" />
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: "#FEE2E2" }]}>
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.errorLight }]}>
           <SettingRow
-            icon={<LogOut size={16} color="#EF4444" strokeWidth={2} />}
-            iconBg="#FEF2F2"
+            icon={<LogOut size={16} color={theme.colors.error} strokeWidth={2} />}
+            iconBg={theme.colors.errorLight}
             title="Log Out"
             subtitle="Sign out of your account"
             onPress={handleLogout}

@@ -115,42 +115,42 @@ export const lightTheme = {
 export const darkTheme = {
   colors: {
     primary: "#60A5FA",
-    primaryLight: "#172554",
-    primaryMid: "#1D4ED8",
+    primaryLight: "#1E3A5F",   // deep blue tint — good on #111827
+    primaryMid: "#2563EB",
     medicalBlue: "#60A5FA",
 
     teal: "#2DD4BF",
-    tealLight: "#0F766E",
+    tealLight: "#0F3D38",      // deep teal tint — visible badge bg
     cyan: "#22D3EE",
 
     background: "#0B1120",
     backgroundAlt: "#111827",
     surface: "#111827",
-    surfaceElevated: "#1F2937",
-    cardBorder: "#243244",
+    surfaceElevated: "#1E293B",
+    cardBorder: "#1E3A5F22",   // subtle blue-tinted border
     border: "#243244",
-    borderLight: "#1F2A3D",
+    borderLight: "#1A2640",
 
-    textPrimary: "#F8FAFC",
-    textSecondary: "#CBD5E1",
-    textTertiary: "#94A3B8",
+    textPrimary: "#F1F5F9",    // near-white, softer than pure white
+    textSecondary: "#94A3B8",  // slate-400 — calm secondary
+    textTertiary: "#64748B",   // slate-500 — muted
     textInverted: "#0B1120",
 
-    success: "#22C55E",
-    successLight: "#14532D",
-    warning: "#F59E0B",
-    warningLight: "#78350F",
-    error: "#F87171",
-    errorLight: "#7F1D1D",
+    success: "#4ADE80",        // bright enough for dark bg
+    successLight: "#052E16",   // deep green tint card bg
+    warning: "#FBBF24",        // amber bright
+    warningLight: "#451A03",   // deep amber tint
+    error: "#F87171",          // red-400 — readable on dark
+    errorLight: "#450A0A",     // deep red tint
 
-    badgeCase: "#A78BFA",
-    badgeCaseLight: "#312E81",
-    badgeImage: "#38BDF8",
-    badgeImageLight: "#164E63",
-    badgeVideo: "#F472B6",
-    badgeVideoLight: "#831843",
-    badgeText: "#4ADE80",
-    badgeTextLight: "#14532D",
+    badgeCase: "#C4B5FD",      // violet-300
+    badgeCaseLight: "#1E1042", // deep violet tint
+    badgeImage: "#7DD3FC",     // sky-300
+    badgeImageLight: "#0C2A40",
+    badgeVideo: "#F9A8D4",     // pink-300
+    badgeVideoLight: "#2D0B1E",
+    badgeText: "#86EFAC",      // green-300
+    badgeTextLight: "#052E16",
 
     darkBackground: "#0B1120"
   },
@@ -182,6 +182,7 @@ export const darkTheme = {
     }
   }
 };
+
 
 export const theme = lightTheme;
 

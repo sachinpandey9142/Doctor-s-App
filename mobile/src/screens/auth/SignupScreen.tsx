@@ -129,14 +129,19 @@ export function SignupScreen() {
     }
   };
 
+  const isDark = theme.colors.background !== "#F8FAFC";
+  const bgColors: [string, string, string] = isDark
+    ? ["#0B1120", "#0F172A", "#111827"]
+    : ["#EEF2FF", "#F8FAFC", "#F0FDFA"];
+
   return (
-    <LinearGradient colors={["#EEF2FF", "#F8FAFC", "#F0FDFA"]} style={styles.gradient}>
+    <LinearGradient colors={bgColors} style={styles.gradient}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
           {/* ── Hero ─────────────────────────────────────────────────── */}
           <View style={styles.hero}>
-            <View style={[styles.iconWrap, { backgroundColor: theme.colors.tealLight }]}>
+            <View style={[styles.iconWrap, { backgroundColor: isDark ? "rgba(20,184,166,0.16)" : theme.colors.tealLight }]}>
               <UserPlus size={28} color={theme.colors.teal} strokeWidth={2.5} />
             </View>
             <Text style={[styles.brand, { color: theme.colors.teal }]}>Doctor's App</Text>
@@ -251,7 +256,7 @@ export function SignupScreen() {
             </Pressable>
 
             {error ? (
-              <View style={[styles.errorWrap, { backgroundColor: theme.colors.errorLight, borderColor: "#FCA5A5" }]}>
+              <View style={[styles.errorWrap, { backgroundColor: isDark ? "rgba(239,68,68,0.10)" : theme.colors.errorLight, borderColor: isDark ? "rgba(248,113,113,0.3)" : "#FCA5A5" }]}>
                 <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
               </View>
             ) : null}

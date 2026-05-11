@@ -41,7 +41,7 @@ export const getUserPosts = async (userId: string): Promise<Post[]> => {
   const response = await apiClient.get<ApiResponse<Post[]>>(
     `/users/${userId}/posts`,
   );
-  return response.data.data;
+  return Array.isArray(response.data.data) ? response.data.data : [];
 };
 
 export const searchUsersRequest = async (

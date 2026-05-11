@@ -11,6 +11,7 @@ import {
   View,
   ScrollView
 } from "react-native";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -70,6 +71,7 @@ interface OptionsSheetProps {
 }
 
 function OptionsSheet({ visible, isOwner, onDelete, onReport, onShare, onSave, onClose }: OptionsSheetProps) {
+  const theme = useTheme();
   const sheetY = useSharedValue(300);
   const bgOpacity = useSharedValue(0);
 
@@ -96,55 +98,70 @@ function OptionsSheet({ visible, isOwner, onDelete, onReport, onShare, onSave, o
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }, backdropStyle]} />
       </TouchableWithoutFeedback>
 
-      <Animated.View style={[optStyles.sheet, sheetStyle]}>
-        <View style={optStyles.handle} />
+      <Animated.View
+        style={[
+          optStyles.sheet,
+          sheetStyle,
+          {
+            backgroundColor: theme.colors.surfaceElevated,
+            shadowColor: theme.colors.textPrimary,
+          },
+        ]}
+      >
+        <View style={[optStyles.handle, { backgroundColor: theme.colors.border }]} />
 
         {isOwner ? (
           <Pressable style={optStyles.option} onPress={onDelete}>
-            <View style={[optStyles.iconWrap, { backgroundColor: "#FFF1F2" }]}>
-              <Trash2 size={18} color="#F43F5E" />
+            <View style={[optStyles.iconWrap, { backgroundColor: theme.colors.errorLight }]}>
+              <Trash2 size={18} color={theme.colors.error} />
             </View>
             <View>
-              <Text style={optStyles.optionLabel}>Delete Post</Text>
-              <Text style={optStyles.optionSub}>Permanently remove this post</Text>
+              <Text style={[optStyles.optionLabel, { color: theme.colors.textPrimary }]}>Delete Post</Text>
+              <Text style={[optStyles.optionSub, { color: theme.colors.textSecondary }]}>Permanently remove this post</Text>
             </View>
           </Pressable>
         ) : (
           <Pressable style={optStyles.option} onPress={onReport}>
-            <View style={[optStyles.iconWrap, { backgroundColor: "#FFF7ED" }]}>
-              <Flag size={18} color="#F97316" />
+            <View style={[optStyles.iconWrap, { backgroundColor: theme.colors.warningLight }]}>
+              <Flag size={18} color={theme.colors.warning} />
             </View>
             <View>
-              <Text style={optStyles.optionLabel}>Report Post</Text>
-              <Text style={optStyles.optionSub}>Flag inappropriate content</Text>
+              <Text style={[optStyles.optionLabel, { color: theme.colors.textPrimary }]}>Report Post</Text>
+              <Text style={[optStyles.optionSub, { color: theme.colors.textSecondary }]}>Flag inappropriate content</Text>
             </View>
           </Pressable>
         )}
 
-        <View style={optStyles.divider} />
+        <View style={[optStyles.divider, { backgroundColor: theme.colors.borderLight }]} />
 
         <Pressable style={optStyles.option} onPress={onShare}>
-          <View style={[optStyles.iconWrap, { backgroundColor: "#EFF6FF" }]}>
-            <Share2 size={18} color="#2563EB" />
+          <View style={[optStyles.iconWrap, { backgroundColor: theme.colors.primaryLight }]}>
+            <Share2 size={18} color={theme.colors.primary} />
           </View>
           <View>
-            <Text style={optStyles.optionLabel}>Share</Text>
-            <Text style={optStyles.optionSub}>Share with colleagues</Text>
+            <Text style={[optStyles.optionLabel, { color: theme.colors.textPrimary }]}>Share</Text>
+            <Text style={[optStyles.optionSub, { color: theme.colors.textSecondary }]}>Share with colleagues</Text>
           </View>
         </Pressable>
 
         <Pressable style={optStyles.option} onPress={onSave}>
-          <View style={[optStyles.iconWrap, { backgroundColor: "#F0FDF4" }]}>
-            <Bookmark size={18} color="#16A34A" />
+          <View style={[optStyles.iconWrap, { backgroundColor: theme.colors.successLight }]}>
+            <Bookmark size={18} color={theme.colors.success} />
           </View>
           <View>
-            <Text style={optStyles.optionLabel}>Save Post</Text>
-            <Text style={optStyles.optionSub}>Add to your saved items</Text>
+            <Text style={[optStyles.optionLabel, { color: theme.colors.textPrimary }]}>Save Post</Text>
+            <Text style={[optStyles.optionSub, { color: theme.colors.textSecondary }]}>Add to your saved items</Text>
           </View>
         </Pressable>
 
-        <Pressable style={optStyles.cancelBtn} onPress={onClose}>
-          <Text style={optStyles.cancelText}>Cancel</Text>
+        <Pressable
+          style={[
+            optStyles.cancelBtn,
+            { backgroundColor: theme.colors.backgroundAlt },
+          ]}
+          onPress={onClose}
+        >
+          <Text style={[optStyles.cancelText, { color: theme.colors.textSecondary }]}>Cancel</Text>
         </Pressable>
       </Animated.View>
     </Modal>
@@ -259,13 +276,21 @@ function PostCardBase({
   };
 
   const handleCardPress = () => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      if (!liked) handleLike();
-      showBigHeart(tapXRef.current, tapYRef.current);
-    }
-    lastTapRef.current = now;
+    // Single tap on card does nothing special anymore since double tap is moved to image
   };
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .runOnJS(true)
+    .onStart((e) => {
+      showBigHeart(e.x, e.y);
+      if (!liked) {
+        triggerLikeAnimation();
+        onLike(post._id);
+      } else {
+        likeScale.value = withSequence(withSpring(0.72), withSpring(1));
+      }
+    });
 
   const handleLongPress = () => {
     hapticTap();
@@ -320,22 +345,22 @@ function PostCardBase({
         <Modal transparent visible={isExpanded} animationType="fade" onRequestClose={() => setIsExpanded(false)} statusBarTranslucent>
           <TouchableWithoutFeedback onPress={() => setIsExpanded(false)}>
             <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 16 }}>
-              <View style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", maxHeight: "90%" }}>
+              <View style={{ backgroundColor: theme.colors.surface, borderRadius: 14, overflow: "hidden", maxHeight: "90%" }}>
                 <View style={{ padding: 12, flexDirection: "row", justifyContent: "flex-end" }}>
                   <Pressable onPress={() => setIsExpanded(false)} style={{ padding: 6 }}>
-                    <Text style={{ fontSize: 18 }}>✕</Text>
+                    <Text style={{ fontSize: 18, color: theme.colors.textPrimary }}>✕</Text>
                   </Pressable>
                 </View>
                 <ScrollView contentContainerStyle={{ padding: 12 }}>
                   {hasMedia ? (
                     <Image source={{ uri: mediaUri }} style={{ width: "100%", height: 420, borderRadius: 12 }} contentFit="cover" />
                   ) : null}
-                  <Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold", fontSize: 16 }}>{isAnonymous ? "Anonymous Case" : post.userId.name}</Text>
-                  {post.content ? <Text style={{ marginTop: 8, fontFamily: "Manrope_500Medium", fontSize: 15 }}>{post.content}</Text> : null}
+                  <Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold", fontSize: 16, color: theme.colors.textPrimary }}>{isAnonymous ? "Anonymous Case" : post.userId.name}</Text>
+                  {post.content ? <Text style={{ marginTop: 8, fontFamily: "Manrope_500Medium", fontSize: 15, color: theme.colors.textSecondary }}>{post.content}</Text> : null}
                   {post.type === "case" && (
                     <>
-                      {post.symptoms ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold" }}>Symptoms</Text><Text style={{ marginTop: 4 }}>{post.symptoms}</Text></> : null}
-                      {post.observations ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold" }}>Observations</Text><Text style={{ marginTop: 4 }}>{post.observations}</Text></> : null}
+                      {post.symptoms ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold", color: theme.colors.textPrimary }}>Symptoms</Text><Text style={{ marginTop: 4, color: theme.colors.textSecondary }}>{post.symptoms}</Text></> : null}
+                      {post.observations ? <><Text style={{ marginTop: 12, fontFamily: "Manrope_700Bold", color: theme.colors.textPrimary }}>Observations</Text><Text style={{ marginTop: 4, color: theme.colors.textSecondary }}>{post.observations}</Text></> : null}
                       {post.reportImages && post.reportImages.length > 0 && (
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
                           {post.reportImages.map((img, idx) => (
@@ -415,83 +440,93 @@ function PostCardBase({
 
         {/* ── Media ── hero element ─────────────────────────────── */}
         {hasMedia ? (
-          <Pressable onPress={() => setIsExpanded(true)} style={{ borderRadius: 14, overflow: 'hidden' }}>
-            <View style={styles.mediaContainer}>
-              <Image
-                source={{ uri: mediaUri }}
-                style={styles.postImage}
-                contentFit="cover"
-                transition={350}
-              />
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.35)"]}
-                start={{ x: 0, y: 0.4 }}
-                end={{ x: 0, y: 1 }}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-              />
-              {post.type === "video" && (
-                <View style={styles.videoOverlay}>
-                  <View style={styles.playCircle}>
-                    <PlayCircle size={52} color="#FFFFFF" />
+          <GestureDetector gesture={doubleTapGesture}>
+            <Pressable onPress={() => setIsExpanded(true)} style={{ borderRadius: 14, overflow: 'hidden' }}>
+              <View style={styles.mediaContainer}>
+                <Image
+                  source={{ uri: mediaUri }}
+                  style={styles.postImage}
+                  contentFit="cover"
+                  transition={350}
+                />
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.35)"]}
+                  start={{ x: 0, y: 0.4 }}
+                  end={{ x: 0, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                {post.type === "video" && (
+                  <View style={styles.videoOverlay}>
+                    <View style={styles.playCircle}>
+                      <PlayCircle size={52} color="#FFFFFF" />
+                    </View>
                   </View>
-                </View>
-              )}
-              {/* Position-aware double-tap heart */}
-              <Animated.View style={[styles.bigHeart, bigHeartAnimStyle]} pointerEvents="none">
-                <Heart size={84} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
-              </Animated.View>
-            </View>
-          </Pressable>
+                )}
+                {/* Position-aware double-tap heart */}
+                <Animated.View style={[styles.bigHeart, bigHeartAnimStyle]} pointerEvents="none">
+                  <Heart size={84} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+                </Animated.View>
+              </View>
+            </Pressable>
+          </GestureDetector>
         ) : null}
 
         {/* ── Case block ──────────────────────────────────────────── */}
         {post.type === "case" ? (
           <Pressable onPress={() => setIsExpanded(true)} style={{ borderRadius: 12, overflow: 'hidden' }}>
-            <View style={styles.caseBox}>
-            <View style={styles.caseTitleRow}>
-              <View style={styles.caseIconWrap}>
-                <Stethoscope size={11} color="#7C3AED" strokeWidth={2.2} />
+            <View
+              style={[
+                styles.caseBox,
+                {
+                  backgroundColor: theme.colors.badgeCaseLight,
+                  borderColor: theme.colors.badgeCase + "40",
+                },
+              ]}
+            >
+              <View style={styles.caseTitleRow}>
+                <View style={[styles.caseIconWrap, { backgroundColor: theme.colors.badgeCase + "25" }]}>
+                  <Stethoscope size={11} color={theme.colors.badgeCase} strokeWidth={2.2} />
+                </View>
+                <Text style={[styles.caseTitle, { color: theme.colors.badgeCase }]}>CASE DISCUSSION</Text>
               </View>
-              <Text style={styles.caseTitle}>CASE DISCUSSION</Text>
+              {post.symptoms ? (
+                <View style={styles.caseSection}>
+                  <Text style={[styles.caseKey, { color: theme.colors.badgeCase }]}>SYMPTOMS</Text>
+                  <Text style={[styles.caseValue, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                    {post.symptoms}
+                  </Text>
+                </View>
+              ) : null}
+              {post.observations ? (
+                <View style={styles.caseSection}>
+                  <Text style={[styles.caseKey, { color: theme.colors.badgeCase }]}>OBSERVATIONS</Text>
+                  <Text style={[styles.caseValue, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                    {post.observations}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.caseActions}>
+                {onViewCase && (
+                  <Pressable
+                    style={[styles.caseOutlineBtn, { borderColor: theme.colors.badgeCase }]}
+                    onPress={() => { hapticTap(); onViewCase(post); }}
+                  >
+                    <Text style={[styles.caseOutlineBtnText, { color: theme.colors.badgeCase }]}>View Details</Text>
+                  </Pressable>
+                )}
+                {onJoinDiscussion && (
+                  <Pressable
+                    style={[styles.discussBtn, { backgroundColor: theme.colors.badgeCase }]}
+                    onPress={() => { hapticTap(); onJoinDiscussion(post); }}
+                  >
+                    <Users size={14} color="#FFFFFF" strokeWidth={2} />
+                    <Text style={styles.discussBtnText}>Discuss</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
-            {post.symptoms ? (
-              <View style={styles.caseSection}>
-                <Text style={styles.caseKey}>SYMPTOMS</Text>
-                <Text style={[styles.caseValue, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                  {post.symptoms}
-                </Text>
-              </View>
-            ) : null}
-            {post.observations ? (
-              <View style={styles.caseSection}>
-                <Text style={styles.caseKey}>OBSERVATIONS</Text>
-                <Text style={[styles.caseValue, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                  {post.observations}
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.caseActions}>
-              {onViewCase && (
-                <Pressable
-                  style={styles.caseOutlineBtn}
-                  onPress={() => { hapticTap(); onViewCase(post); }}
-                >
-                  <Text style={styles.caseOutlineBtnText}>View Details</Text>
-                </Pressable>
-              )}
-              {onJoinDiscussion && (
-                <Pressable
-                  style={styles.discussBtn}
-                  onPress={() => { hapticTap(); onJoinDiscussion(post); }}
-                >
-                  <Users size={14} color="#FFFFFF" strokeWidth={2} />
-                  <Text style={styles.discussBtnText}>Discuss</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-        </Pressable>
+          </Pressable>
         ) : null}
 
         {/* ── Actions row ─────────────────────────────────────────── */}
@@ -500,11 +535,15 @@ function PostCardBase({
             onPress={handleLike}
             onPressIn={() => pressIn(likeScale)}
             onPressOut={() => pressOut(likeScale)}
-            style={[styles.actionBtn, likeAnimStyle, liked && styles.actionBtnLiked]}
+            style={[
+              styles.actionBtn,
+              likeAnimStyle,
+              liked && { backgroundColor: theme.colors.error + "18" },
+            ]}
             hitSlop={8}
           >
-            <Heart size={20} color={liked ? "#F43F5E" : theme.colors.textSecondary} fill={liked ? "#F43F5E" : "transparent"} strokeWidth={2} />
-            <Text style={[styles.actionLabel, { color: liked ? "#F43F5E" : theme.colors.textSecondary }]}>
+            <Heart size={20} color={liked ? theme.colors.error : theme.colors.textSecondary} fill={liked ? theme.colors.error : "transparent"} strokeWidth={2} />
+            <Text style={[styles.actionLabel, { color: liked ? theme.colors.error : theme.colors.textSecondary }]}>
               {post.likes.length > 0 ? post.likes.length.toLocaleString() : "Like"}
             </Text>
           </AnimatedPressable>
@@ -689,9 +728,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12
   },
-  actionBtnLiked: { backgroundColor: "#FFF1F2" },
+  actionBtnLiked: {},
   bookmarkBtn: { marginLeft: "auto" },
-  actionLabel: { fontFamily: "Manrope_700Bold", fontSize: 13 }
+  actionLabel: { fontFamily: "Manrope_700Bold", fontSize: 13 },
 });
 
 const optStyles = StyleSheet.create({
@@ -705,57 +744,54 @@ const optStyles = StyleSheet.create({
     paddingBottom: 34,
     paddingTop: 12,
     shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
   },
   handle: {
     alignSelf: "center",
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#CBD5E1",
-    marginBottom: 16
+    marginBottom: 16,
   },
   option: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
-    paddingVertical: 14
+    paddingVertical: 14,
   },
   iconWrap: {
     width: 42,
     height: 42,
     borderRadius: 12,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   optionLabel: {
     fontFamily: "SpaceGrotesk_700Bold",
     fontSize: 15,
-    color: "#0F172A"
   },
   optionSub: {
     fontFamily: "Manrope_500Medium",
     fontSize: 12.5,
-    color: "#64748B",
-    marginTop: 1
+    marginTop: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: "#F1F5F9",
     marginHorizontal: 20,
-    marginVertical: 6
+    marginVertical: 6,
   },
   cancelBtn: {
     marginHorizontal: 20,
     marginTop: 10,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center"
+    alignItems: "center",
   },
   cancelText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
-    color: "#475569"
-  }
+  },
 });
