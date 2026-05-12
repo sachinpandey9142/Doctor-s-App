@@ -20,7 +20,7 @@ type StoryItem =
 
 const AVATAR_SIZE = 58;
 
-function StoryBubble({ group }: { group: StoryGroup }) {
+const StoryBubble = React.memo(function StoryBubble({ group }: { group: StoryGroup }) {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -53,9 +53,9 @@ function StoryBubble({ group }: { group: StoryGroup }) {
       </View>
     </Pressable>
   );
-}
+});
 
-function AddStoryBubble() {
+const AddStoryBubble = React.memo(function AddStoryBubble() {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const currentUser = useAuthStore((state) => state.user);
@@ -84,7 +84,9 @@ function AddStoryBubble() {
       </View>
     </Pressable>
   );
-}
+});
+
+const StorySeparator = () => <View style={{ width: 10 }} />;
 
 export function StoryBar() {
   const groups = useStoryStore((state) => state.groups);
@@ -117,7 +119,7 @@ export function StoryBar() {
       keyExtractor={(item) => (item.kind === "add" ? "add-story" : `story-${item.group.user._id}`)}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.listContent}
-      ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+      ItemSeparatorComponent={StorySeparator}
       initialNumToRender={8}
       windowSize={5}
       removeClippedSubviews

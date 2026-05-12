@@ -22,17 +22,15 @@ Premium React Native client for verified medical professionals with social feed,
 
 Create a .env file inside mobile:
 
-EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8080/api
-EXPO_PUBLIC_SOCKET_URL=http://10.0.2.2:8080
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8080/api
+EXPO_PUBLIC_SOCKET_URL=http://127.0.0.1:8080
 
-If you skip the .env file, Android still defaults to `10.0.2.2` and other platforms default to `localhost`.
+If you skip the .env file, Android defaults to `127.0.0.1` for adb reverse and other platforms default to `localhost`.
 
 For physical Android device via USB, run:
 
 - adb reverse tcp:8080 tcp:8080
-  Then use:
-- EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8080/api
-- EXPO_PUBLIC_SOCKET_URL=http://127.0.0.1:8080
+  Then use the localhost values above.
 
 ## Key Structure
 

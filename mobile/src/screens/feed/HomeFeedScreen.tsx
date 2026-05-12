@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import {
   Animated as RNAnimated,
-  FlatList,
   Platform,
   Pressable,
   RefreshControl,
@@ -17,15 +16,12 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Activity, Bell, Plus, Search } from "lucide-react-native";
 import { useTheme } from "styled-components/native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
@@ -39,6 +35,7 @@ import { useNotificationStore } from "@/store/notificationStore";
 import { hapticTap } from "@/utils/haptics";
 import type { Post } from "@/types/models";
 import { theme as appTheme } from "@/constants/theme";
+import { useScrollHeader } from "@/hooks/useScrollHeader";
 
 type FilterType = "All" | "Cases" | "Media" | "Text";
 const FILTERS: FilterType[] = ["All", "Cases", "Media", "Text"];
@@ -97,11 +94,18 @@ export function HomeFeedScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const skeletonOpacity = useRef(new RNAnimated.Value(1)).current;
   const prevLoadingRef = useRef(loading);
-  const headerScrollY = useRef(new RNAnimated.Value(0)).current;
-  const feedListRef = useRef<FlatList<Post> | null>(null);
-  const headerTopPad = insets.top;
-  const [headerHeight, setHeaderHeight] = useState(headerTopPad + 222);
+  const feedListRef = useRef<Animated.FlatList<Post> | null>(null);
 
+  // ── Inline scroll-away header animations ────────────────────────────────
+  const {
+    scrollHandler,
+    brandStyle,
+    storyStyle,
+    filterStyle,
+    fabStyle,
+  } = useScrollHeader();
+
+  // ── Skeleton fade-out on first load ─────────────────────────────────────
   useEffect(() => {
     if (prevLoadingRef.current && !loading) {
       RNAnimated.timing(skeletonOpacity, {
@@ -116,6 +120,25 @@ export function HomeFeedScreen() {
   useEffect(() => {
     fetchInitialFeed();
   }, [fetchInitialFeed]);
+
+  const handleLike = useCallback(
+    (postId: string) => {
+      void toggleLike(postId);
+    },
+    [toggleLike],
+  );
+
+  const handleDelete = useCallback(
+    (post: Post) => {
+      void deletePost(post._id);
+    },
+    [deletePost],
+  );
+
+  const safeAreaStyle = useMemo(
+    () => ({ height: insets.top, backgroundColor: theme.colors.background }),
+    [insets.top, theme.colors.background],
+  );
 
   const filteredPosts = useMemo(() => {
     if (activeFilter === "All") return posts;
@@ -183,35 +206,25 @@ export function HomeFeedScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: Post; index: number }) => (
-      <Animated.View
-        entering={FadeInDown.delay(Math.min(index * 40, 200))
-          .duration(280)
-          .springify()}
-      >
-        <PostCard
-          post={item}
-          currentUserId={user?._id}
-          onLike={(postId) => {
-            void toggleLike(postId);
-          }}
-          onComment={openComments}
-          onAuthorPress={openProfile}
-          onDelete={(post) => {
-            void deletePost(post._id);
-          }}
-          onJoinDiscussion={handleJoinDiscussion}
-          onViewCase={handleViewCase}
-          isAdmin={user?.role === "admin"}
-        />
-      </Animated.View>
+      <PostCard
+        post={item}
+        currentUserId={user?._id}
+        onLike={handleLike}
+        onComment={openComments}
+        onAuthorPress={openProfile}
+        onDelete={handleDelete}
+        onJoinDiscussion={handleJoinDiscussion}
+        onViewCase={handleViewCase}
+        isAdmin={user?.role === "admin"}
+      />
     ),
     [
-      deletePost,
+      handleDelete,
       handleJoinDiscussion,
       handleViewCase,
       openComments,
       openProfile,
-      toggleLike,
+      handleLike,
       user?._id,
       user?.role,
     ],
@@ -222,74 +235,17 @@ export function HomeFeedScreen() {
     [theme.colors],
   );
 
-  // Header fades out smoothly as content scrolls underneath.
-  const headerBgOpacity = headerScrollY.interpolate({
-    inputRange: [0, 130],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
-  const headerBorderOpacity = headerScrollY.interpolate({
-    inputRange: [80, 180],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
-  const headerContentOpacity = headerScrollY.interpolate({
-    inputRange: [0, 220],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
-  const headerContentTranslate = headerScrollY.interpolate({
-    inputRange: [0, 220],
-    outputRange: [0, -18],
-    extrapolate: "clamp",
-  });
-  const brandTextOpacity = headerScrollY.interpolate({
-    inputRange: [0, 120],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
-  const brandTextTranslate = headerScrollY.interpolate({
-    inputRange: [0, 120],
-    outputRange: [0, -10],
-    extrapolate: "clamp",
-  });
-  const listTopPad = headerHeight;
   const showSkeleton = loading && posts.length === 0;
 
-  return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      {/* ── Fixed header ──────────────────────────────────────── */}
-      <SafeAreaView
-        edges={["top"]}
-        style={styles.headerWrap}
-        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
-      >
-        {/* Animated white bg on scroll — only for brand area */}
-        <RNAnimated.View
-          style={[
-            styles.brandBgOverlay,
-            {
-              backgroundColor: theme.colors.surface,
-              opacity: headerBgOpacity,
-              height: headerHeight,
-            },
-          ]}
-        />
-        {/* Animated bottom border on scroll */}
-        <RNAnimated.View
-          style={[
-            styles.headerBorder,
-            {
-              borderBottomColor: theme.colors.border,
-              opacity: headerBorderOpacity,
-            },
-          ]}
-        />
+  // ── Inline Header (scrolls with feed) ─────────────────────────────────
+  const ListHeader = useMemo(
+    () => (
+      <View style={styles.headerRoot}>
+        {/* Safe area top inset — respects notch/dynamic island */}
+        <View style={safeAreaStyle} />
 
-        {/* Brand + actions */}
-        <View style={styles.headerInner}>
+        {/* ── Brand bar — logo + action buttons ──────────────────── */}
+        <Animated.View style={[styles.brandBar, brandStyle]}>
           <Pressable
             onPress={handleBrandPress}
             style={({ pressed }) => [
@@ -309,12 +265,7 @@ export function HomeFeedScreen() {
                 strokeWidth={2.5}
               />
             </LinearGradient>
-            <RNAnimated.View
-              style={{
-                opacity: brandTextOpacity,
-                transform: [{ translateY: brandTextTranslate }],
-              }}
-            >
+            <View>
               <Text
                 style={[styles.brandName, { color: theme.colors.textPrimary }]}
               >
@@ -327,9 +278,9 @@ export function HomeFeedScreen() {
                 ]}
                 numberOfLines={1}
               >
-                Tap to jump to the top
+                Your medical community
               </Text>
-            </RNAnimated.View>
+            </View>
           </Pressable>
 
           <View style={styles.headerActions}>
@@ -354,6 +305,7 @@ export function HomeFeedScreen() {
                 strokeWidth={2}
               />
             </Pressable>
+
             <Pressable
               style={({ pressed }) => [
                 styles.headerBtn,
@@ -383,19 +335,15 @@ export function HomeFeedScreen() {
               ) : null}
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
 
-        <RNAnimated.View
-          style={{
-            opacity: headerContentOpacity,
-            transform: [{ translateY: headerContentTranslate }],
-          }}
-        >
-          <View style={styles.storyBarWrap}>
-            <StoryBar />
-          </View>
+        {/* ── Story bar — scrolls away with parallax compression ─── */}
+        <Animated.View style={[styles.storyBarWrap, storyStyle]}>
+          <StoryBar />
+        </Animated.View>
 
-          {/* Filter chips */}
+        {/* ── Filter chips — subtle fade as they scroll away ──────── */}
+        <Animated.View style={filterStyle}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -451,41 +399,62 @@ export function HomeFeedScreen() {
               );
             })}
           </ScrollView>
-        </RNAnimated.View>
-      </SafeAreaView>
+        </Animated.View>
 
+        {/* Soft separator between header and feed content */}
+        <View
+          style={[
+            styles.headerSeparator,
+            { borderBottomColor: theme.colors.border },
+          ]}
+        />
+      </View>
+    ),
+    [
+      insets.top,
+      theme,
+      brandStyle,
+      storyStyle,
+      filterStyle,
+      handleBrandPress,
+      navigation,
+      unreadCount,
+      activeFilter,
+    ],
+  );
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* ── Feed / Skeleton ──────────────────────────────────── */}
       {showSkeleton ? (
         <RNAnimated.View
-          style={{ paddingTop: listTopPad, flex: 1, opacity: skeletonOpacity }}
+          style={{ paddingTop: insets.top + 60, flex: 1, opacity: skeletonOpacity }}
         >
           {[0, 1, 2].map((i) => (
             <SkeletonCard key={i} colors={skeletonColors} />
           ))}
         </RNAnimated.View>
       ) : (
-        <FlatList
+        <Animated.FlatList
           ref={feedListRef}
           data={filteredPosts}
           renderItem={renderItem}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingTop: listTopPad },
-          ]}
+          contentContainerStyle={styles.listContent}
+          // Header scrolls inline with the feed — no fixed/sticky positioning
+          ListHeaderComponent={ListHeader}
           onEndReached={fetchMoreFeed}
           onEndReachedThreshold={0.5}
-          onScroll={RNAnimated.event(
-            [{ nativeEvent: { contentOffset: { y: headerScrollY } } }],
-            { useNativeDriver: false },
-          )}
+          // Native-thread scroll handler — zero JS bridge overhead
+          onScroll={scrollHandler}
           scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={refreshFeed}
               tintColor={theme.colors.primary}
-              progressViewOffset={listTopPad}
             />
           }
           ListEmptyComponent={
@@ -530,63 +499,54 @@ export function HomeFeedScreen() {
         />
       )}
 
-      {/* ── FAB ─────────────────────────────────────────────── */}
-      <Pressable
-        onPress={() => {
-          hapticTap();
-          navigation.navigate("CreatePost");
-        }}
-        style={({ pressed }) => [
-          styles.fabWrap,
-          { bottom: insets.bottom + 86, opacity: pressed ? 0.9 : 1 },
-        ]}
+      {/* ── FAB ──────────────────────────────────────────────── */}
+      <Animated.View
+        style={[styles.fabWrap, { bottom: insets.bottom + 86 }, fabStyle]}
+        pointerEvents="box-none"
       >
-        <LinearGradient
-          colors={theme.gradients.primary}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fab}
+        <Pressable
+          onPress={() => {
+            hapticTap();
+            navigation.navigate("CreatePost");
+          }}
+          style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >
-          <Plus size={24} color={theme.colors.textInverted} strokeWidth={2.5} />
-        </LinearGradient>
-      </Pressable>
+          <LinearGradient
+            colors={theme.gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fab}
+          >
+            <Plus size={24} color={theme.colors.textInverted} strokeWidth={2.5} />
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // Header
-  headerWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    ...baseShadow.card,
+
+  // ── Header (inline — scrolls with content) ───────────────────────────────
+  headerRoot: {
+    // NO position: absolute, NO zIndex — the header is part of the scroll flow
   },
-  brandBgOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 62,
-  },
-  headerBorder: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerInner: {
+
+  // ── Brand bar ────────────────────────────────────────────────────────────
+  brandBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 11,
+    height: 60,
   },
-  brandRow: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+  },
   brandRowPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   brandIcon: {
     width: 32,
@@ -637,10 +597,13 @@ const styles = StyleSheet.create({
     color: appTheme.colors.textInverted,
     lineHeight: 12,
   },
+
+  // ── Story bar ────────────────────────────────────────────────────────────
   storyBarWrap: {
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
-  // Filter chips
+
+  // ── Filter chips ─────────────────────────────────────────────────────────
   filterList: {
     paddingHorizontal: 14,
     paddingBottom: 10,
@@ -667,9 +630,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 7,
   },
-  // Feed
+
+  // ── Soft separator between header and feed ───────────────────────────────
+  headerSeparator: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 14,
+    marginBottom: 6,
+  },
+
+  // ── Feed ─────────────────────────────────────────────────────────────────
   listContent: { paddingBottom: 120 },
-  // FAB
+
+  // ── FAB ──────────────────────────────────────────────────────────────────
   fabWrap: { position: "absolute", right: 16 },
   fab: {
     width: 54,

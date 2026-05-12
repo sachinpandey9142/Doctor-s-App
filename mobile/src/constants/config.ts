@@ -1,7 +1,21 @@
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-const defaultHost =
-  Platform.OS === "android" ? "http://10.0.2.2:8080" : "http://localhost:8080";
+const defaultBackendPort = "8080";
+
+const resolveDevHost = () => {
+  // Extract dev server IP if running in Expo Go or Dev Client
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  const localhost = debuggerHost?.split(":")[0];
+
+  if (localhost) {
+    return localhost;
+  }
+
+  // Fallbacks: 10.0.2.2 for Android emulators, localhost for iOS simulator
+  return Platform.OS === "android" ? "10.0.2.2" : "localhost";
+};
+const defaultHost = `http://${resolveDevHost()}:${defaultBackendPort}`;
 
 const normalizeUrl = (value: string) => {
   const trimmed = value.trim().replace(/\/+$/, "");

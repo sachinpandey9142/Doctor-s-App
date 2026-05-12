@@ -12,7 +12,7 @@ const isPortFree = (port) =>
 
     tester.unref();
     tester.once("error", () => resolve(false));
-    tester.listen(port, () => {
+    tester.listen(port, '0.0.0.0', () => {
       tester.close(() => resolve(true));
     });
   });
@@ -47,8 +47,8 @@ const startServer = async () => {
   const io = initializeSocket(httpServer);
   app.set("io", io);
 
-  httpServer.listen(port, () => {
-    console.log(`Doctor,s App backend running on http://localhost:${port}`);
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`Doctor's App backend running on http://0.0.0.0:${port}`);
   });
 };
 
