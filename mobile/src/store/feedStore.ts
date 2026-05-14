@@ -6,8 +6,9 @@ import {
   getCasePosts,
   getFeedPosts,
   likePostRequest,
-  deletePostRequest
+  deletePostRequest,
 } from "@/services/api/postApi";
+import { commentPostReplyRequest } from "@/services/api/postApi";
 import { useAuthStore } from "@/store/authStore";
 import { useToastStore, extractErrorMessage } from "@/store/toastStore";
 import type { Comment, Post } from "@/types/models";
@@ -34,6 +35,11 @@ interface FeedState {
   }) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   addComment: (postId: string, text: string) => Promise<Comment>;
+  addReply: (
+    postId: string,
+    text: string,
+    parentCommentId: string,
+  ) => Promise<Comment>;
   deletePost: (postId: string) => Promise<void>;
 }
 
@@ -41,18 +47,23 @@ const mergeUniquePosts = (existing: Post[], incoming: Post[]) => {
   const byId = new Map<string, Post>();
   [...existing, ...incoming].forEach((item) => byId.set(item._id, item));
   return Array.from(byId.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 };
 
 /** Apply an optimistic like/unlike mutation to a post array */
-const applyLikeMutation = (posts: Post[], postId: string, authUserId: string, liked: boolean): Post[] =>
+const applyLikeMutation = (
+  posts: Post[],
+  postId: string,
+  authUserId: string,
+  liked: boolean,
+): Post[] =>
   posts.map((post) => {
     if (post._id !== postId) return post;
     const withoutSelf = post.likes.filter((id) => id !== authUserId);
     return {
       ...post,
-      likes: liked ? [...withoutSelf, authUserId] : withoutSelf
+      likes: liked ? [...withoutSelf, authUserId] : withoutSelf,
     };
   });
 
@@ -73,11 +84,13 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         posts: response.data,
         page: 1,
         hasMore: Number(response.pagination?.totalPages || 1) > 1,
-        loading: false
+        loading: false,
       });
     } catch (error) {
       set({ loading: false });
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to load feed"), "error");
+      useToastStore
+        .getState()
+        .showToast(extractErrorMessage(error, "Failed to load feed"), "error");
     }
   },
 
@@ -95,13 +108,16 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         posts: mergeUniquePosts(state.posts, response.data),
         page: nextPage,
         hasMore: nextPage < Number(response.pagination?.totalPages || 1),
-        loading: false
+        loading: false,
       }));
     } catch (error) {
       set({ loading: false });
       useToastStore
         .getState()
-        .showToast(extractErrorMessage(error, "Failed to load more posts"), "error");
+        .showToast(
+          extractErrorMessage(error, "Failed to load more posts"),
+          "error",
+        );
     }
   },
 
@@ -114,13 +130,16 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         posts: response.data,
         page: 1,
         hasMore: Number(response.pagination?.totalPages || 1) > 1,
-        refreshing: false
+        refreshing: false,
       });
     } catch (error) {
       set({ refreshing: false });
       useToastStore
         .getState()
-        .showToast(extractErrorMessage(error, "Failed to refresh feed"), "error");
+        .showToast(
+          extractErrorMessage(error, "Failed to refresh feed"),
+          "error",
+        );
     }
   },
 
@@ -132,7 +151,10 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       set({ casePosts: [] });
       useToastStore
         .getState()
-        .showToast(extractErrorMessage(error, "Failed to load case discussions"), "error");
+        .showToast(
+          extractErrorMessage(error, "Failed to load case discussions"),
+          "error",
+        );
     }
   },
 
@@ -141,7 +163,10 @@ export const useFeedStore = create<FeedState>((set, get) => ({
 
     set((state) => ({
       posts: [created, ...state.posts],
-      casePosts: created.type === "case" ? [created, ...state.casePosts] : state.casePosts
+      casePosts:
+        created.type === "case"
+          ? [created, ...state.casePosts]
+          : state.casePosts,
     }));
   },
 
@@ -160,7 +185,9 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     const { posts, casePosts } = get();
 
     // Snapshot: remember the current liked state for this post
-    const targetPost = posts.find((p) => p._id === postId) ?? casePosts.find((p) => p._id === postId);
+    const targetPost =
+      posts.find((p) => p._id === postId) ??
+      casePosts.find((p) => p._id === postId);
     if (!targetPost) return;
 
     const wasLiked = targetPost.likes.includes(authUserId);
@@ -168,8 +195,18 @@ export const useFeedStore = create<FeedState>((set, get) => ({
 
     // ── Instant optimistic update ──────────────────────────────────────────
     set((state) => ({
-      posts: applyLikeMutation(state.posts, postId, authUserId, optimisticLiked),
-      casePosts: applyLikeMutation(state.casePosts, postId, authUserId, optimisticLiked)
+      posts: applyLikeMutation(
+        state.posts,
+        postId,
+        authUserId,
+        optimisticLiked,
+      ),
+      casePosts: applyLikeMutation(
+        state.casePosts,
+        postId,
+        authUserId,
+        optimisticLiked,
+      ),
     }));
 
     try {
@@ -178,17 +215,37 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       // Reconcile if server result differs from optimistic assumption
       if (serverLiked !== optimisticLiked) {
         set((state) => ({
-          posts: applyLikeMutation(state.posts, postId, authUserId, serverLiked),
-          casePosts: applyLikeMutation(state.casePosts, postId, authUserId, serverLiked)
+          posts: applyLikeMutation(
+            state.posts,
+            postId,
+            authUserId,
+            serverLiked,
+          ),
+          casePosts: applyLikeMutation(
+            state.casePosts,
+            postId,
+            authUserId,
+            serverLiked,
+          ),
         }));
       }
     } catch (error) {
       // ── Roll back to snapshot state ──────────────────────────────────────
       set((state) => ({
         posts: applyLikeMutation(state.posts, postId, authUserId, wasLiked),
-        casePosts: applyLikeMutation(state.casePosts, postId, authUserId, wasLiked)
+        casePosts: applyLikeMutation(
+          state.casePosts,
+          postId,
+          authUserId,
+          wasLiked,
+        ),
       }));
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to update like"), "error");
+      useToastStore
+        .getState()
+        .showToast(
+          extractErrorMessage(error, "Failed to update like"),
+          "error",
+        );
     }
   },
 
@@ -196,14 +253,22 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     const comment = await commentPostRequest(postId, text);
 
     const mutatePost = (post: Post) =>
-      post._id === postId ? { ...post, commentCount: post.commentCount + 1 } : post;
+      post._id === postId
+        ? { ...post, commentCount: post.commentCount + 1 }
+        : post;
 
     set((state) => ({
       posts: state.posts.map(mutatePost),
-      casePosts: state.casePosts.map(mutatePost)
+      casePosts: state.casePosts.map(mutatePost),
     }));
 
     return comment;
+  },
+
+  addReply: async (postId, text, parentCommentId) => {
+    const reply = await commentPostReplyRequest(postId, text, parentCommentId);
+    // Replies don't increment post comment count (only parent replyCount increments on backend)
+    return reply;
   },
 
   deletePost: async (postId) => {
@@ -211,16 +276,23 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     const { posts, casePosts } = get();
     set({
       posts: posts.filter((p) => p._id !== postId),
-      casePosts: casePosts.filter((p) => p._id !== postId)
+      casePosts: casePosts.filter((p) => p._id !== postId),
     });
 
     try {
       await deletePostRequest(postId);
-      useToastStore.getState().showToast("Post deleted successfully", "success");
+      useToastStore
+        .getState()
+        .showToast("Post deleted successfully", "success");
     } catch (error) {
       // Revert if failed
       set({ posts, casePosts });
-      useToastStore.getState().showToast(extractErrorMessage(error, "Failed to delete post"), "error");
+      useToastStore
+        .getState()
+        .showToast(
+          extractErrorMessage(error, "Failed to delete post"),
+          "error",
+        );
     }
-  }
+  },
 }));

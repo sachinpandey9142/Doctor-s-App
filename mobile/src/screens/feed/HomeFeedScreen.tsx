@@ -36,6 +36,7 @@ import { hapticTap } from "@/utils/haptics";
 import type { Post } from "@/types/models";
 import { theme as appTheme } from "@/constants/theme";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
+import { useCommentSheetStore } from "@/store/commentSheetStore";
 
 type FilterType = "All" | "Cases" | "Media" | "Text";
 const FILTERS: FilterType[] = ["All", "Cases", "Media", "Text"];
@@ -90,6 +91,7 @@ export function HomeFeedScreen() {
   } = useFeedStore((state) => state);
   const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const openSheet = useCommentSheetStore((s) => s.openSheet);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const skeletonOpacity = useRef(new RNAnimated.Value(1)).current;
@@ -152,15 +154,13 @@ export function HomeFeedScreen() {
 
   const openComments = useCallback(
     (post: Post) => {
-      navigation.navigate("Comments", {
-        postId: post._id,
-        title:
-          post.isAnonymous && post.type === "case"
-            ? "Anonymous Case"
-            : post.userId.name,
-      });
+      const title =
+        post.isAnonymous && post.type === "case"
+          ? "Anonymous Case"
+          : post.userId.name;
+      openSheet(post._id, title);
     },
-    [navigation],
+    [openSheet],
   );
 
   const openProfile = useCallback(

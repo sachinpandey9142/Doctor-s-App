@@ -41,10 +41,6 @@ export type RootStackParamList = {
   UserProfile: {
     userId: string;
   };
-  Comments: {
-    postId: string;
-    title?: string;
-  };
   ChatScreen: {
     conversationId: string;
     title?: string;

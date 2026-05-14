@@ -47,7 +47,6 @@ import { CreateGroupScreen } from "@/screens/chat/CreateGroupScreen";
 import { GroupMembersScreen } from "@/screens/chat/GroupMembersScreen";
 import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
 import { SearchScreen } from "@/screens/discovery/SearchScreen";
-import { CommentsScreen } from "@/screens/feed/CommentsScreen";
 import { AdminPanelScreen } from "@/screens/admin/AdminPanelScreen";
 import { CaseDiscussionThreadScreen } from "@/screens/feed/CaseDiscussionThreadScreen";
 import { CaseDetailScreen } from "@/screens/feed/CaseDetailScreen";
@@ -311,11 +310,6 @@ function MainStackNavigator() {
         name="UserProfile"
         component={ProfileScreen}
         options={{ title: "Profile" }}
-      />
-      <RootStack.Screen
-        name="Comments"
-        component={CommentsScreen}
-        options={{ title: "Discussion" }}
       />
       <RootStack.Screen
         name="ChatScreen"

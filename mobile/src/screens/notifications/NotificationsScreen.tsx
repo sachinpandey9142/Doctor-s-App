@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { theme } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/types";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useCommentSheetStore } from "@/store/commentSheetStore";
 import type { NotificationItem } from "@/types/models";
 import { formatRelativeTime } from "@/utils/date";
 
@@ -27,6 +28,7 @@ export function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { notifications, unreadCount, loading, fetchNotifications, markAsRead } = useNotificationStore((s) => s);
+  const openSheet = useCommentSheetStore((s) => s.openSheet);
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
@@ -66,22 +68,29 @@ export function NotificationsScreen() {
       if (!item.isRead) await markAsRead(item._id);
       switch (item.type) {
         case "message":
-          navigation.navigate("ChatScreen", { conversationId: item.referenceId, title: item.triggerUserId?.name || "Conversation" });
+          navigation.navigate("ChatScreen", {
+            conversationId: item.referenceId,
+            title: item.triggerUserId?.name || "Conversation",
+          });
           return;
         case "like":
         case "comment":
-          navigation.navigate("Comments", { postId: item.referenceId, title: item.triggerUserId?.name || "Post" });
+          openSheet(item.referenceId, item.triggerUserId?.name || "Post");
           return;
         case "follow":
-          if (item.triggerUserId?._id) navigation.navigate("UserProfile", { userId: item.triggerUserId._id });
+          if (item.triggerUserId?._id)
+            navigation.navigate("UserProfile", {
+              userId: item.triggerUserId._id,
+            });
           return;
         case "job":
           navigation.navigate("MainTabs", { screen: "Jobs" });
           return;
-        default: return;
+        default:
+          return;
       }
     },
-    [markAsRead, navigation]
+    [markAsRead, navigation, openSheet],
   );
 
   const handleMarkAllRead = useCallback(async () => {

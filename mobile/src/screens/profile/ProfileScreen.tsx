@@ -75,6 +75,7 @@ import type { RootStackParamList } from "@/navigation/types";
 import type { MemoryCollection, Post, User } from "@/types/models";
 import { hapticTap } from "@/utils/haptics";
 import { useStaggeredEntry } from "@/hooks/useStaggeredEntry";
+import { useCommentSheetStore } from "@/store/commentSheetStore";
 
 import { theme } from "@/constants/theme";
 
@@ -155,6 +156,7 @@ export function ProfileScreen() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const deletePost = useFeedStore((s) => s.deletePost);
   const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
+  const openSheet = useCommentSheetStore((s) => s.openSheet);
 
   const loadProfile = useCallback(async () => {
     if (!viewedUserId) return;
@@ -316,12 +318,13 @@ export function ProfileScreen() {
 
   const openComments = useCallback(
     (post: Post) => {
-      navigation.navigate("Comments", {
-        postId: post._id,
-        title: post.userId.name,
-      });
+      const title =
+        post.isAnonymous && post.type === "case"
+          ? "Anonymous Case"
+          : post.userId.name;
+      openSheet(post._id, title);
     },
-    [navigation],
+    [openSheet],
   );
 
   const openCreateMemory = useCallback(() => {

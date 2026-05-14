@@ -11,56 +11,57 @@ const signToken = (user) =>
   });
 
 const register = catchAsync(async (req, res) => {
-  const {
-    name,
-    email,
-    password,
-    role,
-    specialization = "",
-    hospital = "",
-    experience = 0,
-    profileImage = "",
-    idDocument = "",
-  } = req.body;
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[auth] register request", {
+  try {
+    const {
+      name,
       email,
+      password,
       role,
-      hasPassword: Boolean(password),
+      specialization = "",
+      hospital = "",
+      experience = 0,
+      profileImage = "",
+      idDocument = "",
+    } = req.body;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[auth] register request body:", req.body);
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const existingUser = await User.findOne({ email: normalizedEmail });
+
+    if (existingUser) {
+      throw new ApiError(409, "Email is already registered");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      name: String(name).trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role,
+      specialization: String(specialization || "").trim(),
+      hospital: String(hospital || "").trim(),
+      experience: Number(experience) || 0,
+      profileImage: String(profileImage || "").trim(),
+      idDocument: String(idDocument || "").trim(),
     });
+
+    const token = signToken(user);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        token,
+        user: user.toJSON(),
+      },
+    });
+  } catch (error) {
+    console.error("[auth] register error:", error);
+    throw error;
   }
-
-  const normalizedEmail = String(email).toLowerCase().trim();
-  const existingUser = await User.findOne({ email: normalizedEmail });
-
-  if (existingUser) {
-    throw new ApiError(409, "Email is already registered");
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const user = await User.create({
-    name: String(name).trim(),
-    email: normalizedEmail,
-    password: hashedPassword,
-    role,
-    specialization: String(specialization || "").trim(),
-    hospital: String(hospital || "").trim(),
-    experience: Number(experience) || 0,
-    profileImage: String(profileImage || "").trim(),
-    idDocument: String(idDocument || "").trim(),
-  });
-
-  const token = signToken(user);
-
-  res.status(201).json({
-    success: true,
-    data: {
-      token,
-      user: user.toJSON(),
-    },
-  });
 });
 
 const login = catchAsync(async (req, res) => {

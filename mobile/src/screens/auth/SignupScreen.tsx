@@ -122,7 +122,9 @@ export function SignupScreen() {
       await setSession(result);
       hapticSuccess();
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.message || "Could not create your account");
+      const apiError = requestError?.response?.data;
+      const detail = apiError?.errors?.[0]?.message;
+      setError(detail || apiError?.message || "Could not create your account");
       hapticWarning();
     } finally {
       setLoading(false);

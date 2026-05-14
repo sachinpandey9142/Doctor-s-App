@@ -27,8 +27,7 @@ export const registerRequest = async (
   if (__DEV__) {
     console.log("[authApi] register request", {
       baseURL: apiClient.defaults.baseURL,
-      email: payload.email,
-      role: payload.role,
+      payload,
     });
   }
 

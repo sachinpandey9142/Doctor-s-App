@@ -9,23 +9,63 @@ const {
   likePost,
   commentPost,
   getPostComments,
-  deletePost
+  deletePost,
+  likeComment,
+  reactComment,
 } = require("../controllers/postController");
 const {
   createPostValidation,
   feedValidation,
   postIdValidation,
-  commentValidation
+  commentValidation,
 } = require("../validations/postValidation");
 
 const router = express.Router();
 
-router.post("/", authMiddleware, createPostValidation, validateRequest, createPost);
+router.post(
+  "/",
+  authMiddleware,
+  createPostValidation,
+  validateRequest,
+  createPost,
+);
 router.get("/", authMiddleware, feedValidation, validateRequest, getPosts);
-router.get("/cases", authMiddleware, feedValidation, validateRequest, getCaseDiscussions);
-router.post("/:id/like", authMiddleware, postIdValidation, validateRequest, likePost);
-router.post("/:id/comment", authMiddleware, commentValidation, validateRequest, commentPost);
-router.get("/:id/comments", authMiddleware, postIdValidation, validateRequest, getPostComments);
-router.delete("/:id", authMiddleware, postIdValidation, validateRequest, deletePost);
+router.get(
+  "/cases",
+  authMiddleware,
+  feedValidation,
+  validateRequest,
+  getCaseDiscussions,
+);
+router.post(
+  "/:id/like",
+  authMiddleware,
+  postIdValidation,
+  validateRequest,
+  likePost,
+);
+router.post(
+  "/:id/comment",
+  authMiddleware,
+  commentValidation,
+  validateRequest,
+  commentPost,
+);
+router.get(
+  "/:id/comments",
+  authMiddleware,
+  postIdValidation,
+  validateRequest,
+  getPostComments,
+);
+router.delete(
+  "/:id",
+  authMiddleware,
+  postIdValidation,
+  validateRequest,
+  deletePost,
+);
+router.post("/:id/comments/:commentId/like", authMiddleware, likeComment);
+router.post("/:id/comments/:commentId/react", authMiddleware, reactComment);
 
 module.exports = router;

@@ -93,6 +93,16 @@ export interface Comment {
   userId: User;
   text: string;
   createdAt: string;
+  // Threaded conversation support
+  parentCommentId?: string | null;
+  replyCount?: number;
+  // UI state (not from API)
+  likes?: string[];
+  reactions?: Record<string, string[]>;
+  // Replies array for threaded rendering
+  replies?: Comment[];
+  // Expanded state for UI
+  isExpanded?: boolean;
 }
 
 export interface Job {

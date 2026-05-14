@@ -23,6 +23,7 @@ import { darkTheme, lightTheme } from "./src/constants/theme";
 import { useAuthStore } from "./src/store/authStore";
 import { useThemeStore } from "./src/store/themeStore";
 import { Toast } from "./src/components/common/Toast";
+import { CommentBottomSheet } from "./src/components/feed/CommentBottomSheet";
 
 SplashScreen.preventAutoHideAsync().catch(() => null);
 
@@ -70,6 +71,7 @@ export default function App() {
           <AppNavigator />
           {/* Global toast overlay — rendered above everything, respects safe area insets */}
           <Toast />
+          <CommentBottomSheet />
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
