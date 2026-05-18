@@ -386,10 +386,11 @@ const getMessages = catchAsync(async (req, res) => {
 });
 
 const sendMessage = catchAsync(async (req, res) => {
-  const { conversationId, text = "", mediaUrl = "" } = req.body;
+  const { conversationId, text = "", mediaUrl = "", tempId = "" } = req.body;
 
   const cleanedText = String(text || "").trim();
   const cleanedMediaUrl = String(mediaUrl || "").trim();
+  const cleanedTempId = String(tempId || "").trim();
 
   if (!cleanedText && !cleanedMediaUrl) {
     throw new ApiError(400, "Message text or mediaUrl is required");
@@ -409,6 +410,7 @@ const sendMessage = catchAsync(async (req, res) => {
     senderId: req.user._id,
     text: cleanedText,
     mediaUrl: cleanedMediaUrl,
+    tempId: cleanedTempId,
     readBy: [req.user._id],
   });
 

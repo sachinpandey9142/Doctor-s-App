@@ -78,6 +78,7 @@ export const sendMessageRequest = async (payload: {
   conversationId: string;
   text?: string;
   mediaUrl?: string;
+  tempId?: string;
 }): Promise<Message> => {
   const response = await apiClient.post<ApiResponse<Message>>(
     "/messages",

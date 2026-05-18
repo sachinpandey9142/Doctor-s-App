@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,26 +17,62 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SendHorizontal, Paperclip, Users } from "lucide-react-native";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "styled-components/native";
+import {
+  ArrowLeft,
+  CheckCheck,
+  Mic,
+  MoreVertical,
+  Paperclip,
+  Phone,
+  SendHorizontal,
+  Smile,
+  Users,
+  Video,
+} from "lucide-react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInUp,
+  LinearTransition,
+} from "react-native-reanimated";
+import { useTheme } from "styled-components/native";
 
-import { theme as AppTheme } from "@/constants/theme";
 import { ChatBubble } from "@/components/chat/ChatBubble";
+import { Avatar } from "@/components/common/Avatar";
 import { getSocket } from "@/services/socket/socketClient";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
 import { hapticTap } from "@/utils/haptics";
-import type { Message } from "@/types/models";
+import type { Message, User } from "@/types/models";
 import type { RootStackParamList } from "@/navigation/types";
+
+const isSameDay = (a?: string, b?: string) => {
+  if (!a || !b) return false;
+  return new Date(a).toDateString() === new Date(b).toDateString();
+};
+
+const dateLabel = (value: string) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
 
 export function ChatScreen() {
   const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "ChatScreen">>();
 
   const user = useAuthStore((state) => state.user);
@@ -43,116 +80,131 @@ export function ChatScreen() {
     conversations,
     messagesByConversation,
     paginationByConversation,
+    drafts,
+    isHydrated,
+    hydrateDrafts,
+    setDraft,
     fetchMessages,
     loadOlderMessages,
     sendMessage,
+    resendMessage,
+    removeFailedMessage,
   } = useChatStore((state) => state);
 
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const conversationId = route.params.conversationId;
-  const messages = (messagesByConversation[conversationId] || [])
-    .slice()
-    .reverse();
+  const messages = useMemo(
+    () => (messagesByConversation[conversationId] || []).slice().reverse(),
+    [conversationId, messagesByConversation],
+  );
   const pagination = paginationByConversation[conversationId];
   const conversation = conversations.find(
     (item) => item._id === conversationId,
   );
   const isGroup = Boolean(conversation?.isGroup);
+  const peer = useMemo(
+    () =>
+      (conversation?.participants || []).find((item) => item._id !== user?._id),
+    [conversation?.participants, user?._id],
+  );
   const title =
     route.params.title ||
     conversation?.title ||
-    (isGroup ? "Group Chat" : "Conversation");
+    (isGroup ? "Group Chat" : peer?.name || "Conversation");
+  
+  const isOnline = !isGroup && Boolean(peer?.isOnline);
+  const statusText = isTyping
+    ? "typing..."
+    : isGroup
+      ? `${conversation?.participants?.length || 0} members`
+      : isOnline
+        ? "Online now"
+        : peer?.lastSeen
+          ? `Last seen ${dateLabel(peer.lastSeen)}`
+          : "Offline";
 
   useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      headerRight: isGroup
-        ? () => (
-            <Pressable
-              onPress={() =>
-                navigation.navigate("GroupMembersScreen", {
-                  conversationId,
-                  title,
-                })
-              }
-              style={headerStyles.infoButton}
-            >
-              <Users size={18} color={theme.colors.primary} strokeWidth={2.2} />
-            </Pressable>
-          )
-        : undefined,
-      headerTitle: () => (
-        <Pressable
-          onPress={() => {
-            if (isGroup) {
-              navigation.navigate("GroupMembersScreen", {
-                conversationId,
-                title,
-              });
-            }
-          }}
-          style={headerStyles.titleWrap}
-        >
-          <View>
-            <Text
-              style={[headerStyles.title, { color: theme.colors.textPrimary }]}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-          </View>
-          <View style={headerStyles.statusRow}>
-            <View style={headerStyles.onlineDot} />
-            <Text
-              style={[
-                headerStyles.statusText,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              {isGroup
-                ? `${conversation?.participants?.length || 0} members`
-                : "Online"}
-            </Text>
-          </View>
-        </Pressable>
-      ),
-    });
-  }, [
-    conversation?.participants?.length,
-    conversation?.title,
-    conversationId,
-    isGroup,
-    navigation,
-    theme.colors,
-    title,
-  ]);
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
   useEffect(() => {
+    if (!isHydrated) {
+      hydrateDrafts();
+    }
+  }, [isHydrated, hydrateDrafts]);
+
+  useEffect(() => {
+    setIsTyping(false);
+    setComposerFocused(false);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+
+    if (drafts[conversationId]) {
+      setMessageText(drafts[conversationId]);
+    } else {
+      setMessageText("");
+    }
+
     fetchMessages(conversationId);
     const socket = getSocket();
-    socket?.emit("joinConversation", { conversationId });
-    socket?.emit("markConversationRead", { conversationId });
+    
+    const handleConnect = () => {
+      socket?.emit("joinConversation", { conversationId });
+      socket?.emit("markConversationRead", { conversationId });
+    };
 
-    // Listen for typing events
-    socket?.on(
-      "userTyping",
-      ({ conversationId: cid }: { conversationId: string }) => {
-        if (cid === conversationId) {
-          setIsTyping(true);
-          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-          typingTimerRef.current = setTimeout(() => setIsTyping(false), 2500);
-        }
-      },
-    );
+    // If socket is already connected, join immediately
+    if (socket?.connected) {
+      handleConnect();
+    }
+
+    const handleUserTyping = ({
+      conversationId: cid,
+    }: {
+      conversationId: string;
+    }) => {
+      if (cid === conversationId) {
+        setIsTyping(true);
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => setIsTyping(false), 2500);
+      }
+    };
+
+    const handleUserTypingStopped = ({
+      conversationId: cid,
+    }: {
+      conversationId: string;
+    }) => {
+      if (cid === conversationId) {
+        setIsTyping(false);
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      }
+    };
+
+    const handleMessageReactionUpdated = (payload: { conversationId: string; messageId: string; reactions: Record<string, string[]> }) => {
+      useChatStore.getState().updateMessageReactions(payload.conversationId, payload.messageId, payload.reactions);
+    };
+
+    socket?.on("connect", handleConnect);
+    socket?.on("userTyping", handleUserTyping);
+    socket?.on("userTypingStopped", handleUserTypingStopped);
+    socket?.on("messageReactionUpdated", handleMessageReactionUpdated);
 
     return () => {
       socket?.emit("stopTyping", { conversationId });
-      socket?.off("userTyping");
+      socket?.emit("leaveConversation", { conversationId });
+      socket?.off("connect", handleConnect);
+      socket?.off("userTyping", handleUserTyping);
+      socket?.off("userTypingStopped", handleUserTypingStopped);
+      socket?.off("messageReactionUpdated", handleMessageReactionUpdated);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, [conversationId, fetchMessages]);
@@ -162,13 +214,24 @@ export function ChatScreen() {
     socket?.emit("typing", { conversationId });
   };
 
+  const handleTextChange = (text: string) => {
+    setMessageText(text);
+    setDraft(conversationId, text);
+    emitTyping();
+  };
+
   const handleSend = async () => {
-    if (!messageText.trim()) return;
+    const textToSend = messageText;
+    if (!textToSend.trim()) return;
+    
+    // Optimistic UI - clear immediately
+    setMessageText("");
+    setDraft(conversationId, "");
+    hapticTap();
+    
     try {
       setSending(true);
-      await sendMessage(conversationId, messageText);
-      setMessageText("");
-      hapticTap();
+      await sendMessage(conversationId, textToSend);
     } finally {
       setSending(false);
     }
@@ -178,11 +241,55 @@ export function ChatScreen() {
     void loadOlderMessages(conversationId);
   }, [conversationId, loadOlderMessages]);
 
+  const openGroupInfo = useCallback(() => {
+    if (isGroup) {
+      navigation.navigate("GroupMembersScreen", { conversationId, title });
+    }
+  }, [conversationId, isGroup, navigation, title]);
+
   const renderItem = useCallback(
-    ({ item }: { item: Message }) => (
-      <ChatBubble message={item} isMine={item.senderId._id === user?._id} />
-    ),
-    [user?._id],
+    ({ item, index }: { item: Message; index: number }) => {
+      const isMine = item.senderId._id === user?._id;
+      const previous = messages[index + 1];
+      const next = messages[index - 1];
+      const isGrouped = Boolean(
+        next &&
+        next.senderId._id === item.senderId._id &&
+        isSameDay(next.createdAt, item.createdAt),
+      );
+      const showSender =
+        !isMine &&
+        isGroup &&
+        (!previous ||
+          previous.senderId._id !== item.senderId._id ||
+          !isSameDay(previous.createdAt, item.createdAt));
+      const showDate =
+        !previous || !isSameDay(previous.createdAt, item.createdAt);
+
+      return (
+        <Animated.View layout={LinearTransition.springify().damping(18)}>
+          {showDate ? (
+            <View style={styles.dateSeparator}>
+              <Text style={styles.dateSeparatorText}>
+                {dateLabel(item.createdAt)}
+              </Text>
+            </View>
+          ) : null}
+          <ChatBubble
+            message={item}
+            isMine={isMine}
+            showSender={showSender}
+            isGrouped={isGrouped}
+            onReactionToggle={(msgId, reaction) => {
+              useChatStore.getState().toggleMessageReaction(conversationId, msgId, reaction);
+            }}
+            onRetry={(tempId) => resendMessage(conversationId, tempId)}
+            onDeleteFailed={(tempId) => removeFailedMessage(conversationId, tempId)}
+          />
+        </Animated.View>
+      );
+    },
+    [isGroup, messages, styles, user?._id, conversationId],
   );
 
   const listFooter = pagination?.loading ? (
@@ -195,227 +302,570 @@ export function ChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.colors.backgroundAlt }]}
+      style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      keyboardVerticalOffset={0}
     >
+      <LinearGradient
+        colors={theme.gradients.chatBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.background}
+      />
+      <BlurView
+        intensity={theme.isDark ? 26 : 10}
+        tint={theme.isDark ? "dark" : "light"}
+        style={styles.topGlow}
+      />
+      <BlurView
+        intensity={theme.isDark ? 22 : 8}
+        tint={theme.isDark ? "dark" : "light"}
+        style={styles.bottomGlow}
+      />
+
+      <BlurView
+        intensity={theme.isDark ? 24 : 18}
+        tint={theme.isDark ? "dark" : "light"}
+        style={[styles.header, { paddingTop: insets.top + 5 }]}
+      >
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={({ pressed }) => [
+            styles.headerButton,
+            pressed && styles.headerButtonPressed,
+          ]}
+        >
+          <ArrowLeft size={21} color={theme.colors.icon} strokeWidth={2.4} />
+        </Pressable>
+
+        <Pressable
+          onPress={openGroupInfo}
+          disabled={!isGroup}
+          style={styles.headerIdentity}
+        >
+          <Avatar
+            name={title}
+            uri={isGroup ? conversation?.image : peer?.profileImage}
+            size={38}
+            verified={!isGroup && Boolean(peer?.isVerified)}
+            online={false}
+          />
+
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            <View style={styles.statusRow}>
+              {isTyping ? <TypingDots compact /> : null}
+              <Text
+                style={[styles.headerStatus, isTyping && styles.typingStatus]}
+                numberOfLines={1}
+              >
+                {statusText}
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+
+        <View style={styles.headerActions}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.headerButton,
+              pressed && styles.headerButtonPressed,
+            ]}
+          >
+            <Phone size={19} color={theme.colors.icon} strokeWidth={2.2} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.headerButton,
+              pressed && styles.headerButtonPressed,
+            ]}
+          >
+            <Video size={20} color={theme.colors.icon} strokeWidth={2.2} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.headerButton,
+              pressed && styles.headerButtonPressed,
+            ]}
+          >
+            <MoreVertical
+              size={19}
+              color={theme.colors.icon}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+        </View>
+      </BlurView>
+
       <FlatList
         data={messages}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
         contentContainerStyle={styles.messagesContent}
         inverted
-        initialNumToRender={20}
-        maxToRenderPerBatch={10}
+        initialNumToRender={24}
+        maxToRenderPerBatch={12}
         windowSize={10}
         removeClippedSubviews={Platform.OS === "android"}
         onEndReached={handleLoadOlder}
-        onEndReachedThreshold={0.3}
+        onEndReachedThreshold={0.25}
         ListFooterComponent={listFooter}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <Animated.View
+            entering={FadeIn.duration(220)}
+            style={styles.emptyConversation}
+          >
+            <LinearGradient
+              colors={theme.gradients.emptyIcon}
+              style={styles.emptyIcon}
+            >
+              <CheckCheck
+                size={26}
+                color={theme.colors.primary}
+                strokeWidth={2.2}
+              />
+            </LinearGradient>
+            <Text style={styles.emptyTitle}>Start the conversation</Text>
+            <Text style={styles.emptyText}>
+              Messages are private, secure, and visible here as soon as you send
+              them.
+            </Text>
+          </Animated.View>
+        }
         ListHeaderComponent={
           isTyping ? (
-            <View
-              style={[
-                styles.typingBubble,
-                { backgroundColor: theme.colors.surface },
-              ]}
+            <Animated.View
+              entering={FadeInUp.duration(180)}
+              style={styles.typingRow}
             >
-              <View style={styles.typingDots}>
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: theme.colors.textTertiary },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: theme.colors.textTertiary,
-                      marginHorizontal: 3,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: theme.colors.textTertiary },
-                  ]}
-                />
+              <View style={styles.typingBubble}>
+                <TypingDots />
               </View>
-            </View>
+            </Animated.View>
           ) : null
         }
       />
 
-      {/* ── Input bar ──────────────────────────────────── */}
       <View
-        style={[
-          styles.inputBar,
-          {
-            backgroundColor: theme.colors.surface,
-            borderTopColor: theme.colors.border,
-            paddingBottom: insets.bottom + 10,
-          },
-        ]}
+        style={[styles.composerOuter, { paddingBottom: insets.bottom + 10 }]}
       >
-        <Pressable
+        <BlurView
+          intensity={theme.isDark ? 26 : 16}
+          tint={theme.isDark ? "dark" : "light"}
           style={[
-            styles.attachBtn,
-            {
-              backgroundColor: theme.colors.background,
-              borderColor: theme.colors.border,
-            },
+            styles.composerBlur,
+            composerFocused && styles.composerFocused,
           ]}
         >
-          <Paperclip
-            size={17}
-            color={theme.colors.textSecondary}
-            strokeWidth={2}
-          />
-        </Pressable>
-
-        <View
-          style={[
-            styles.inputWrap,
-            { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border },
-          ]}
-        >
-          <TextInput
-            ref={inputRef}
-            value={messageText}
-            onChangeText={(t) => {
-              setMessageText(t);
-              emitTyping();
-            }}
-            placeholder={
-              isGroup ? "Message the group…" : "Type a secure message…"
-            }
-            placeholderTextColor={theme.colors.textTertiary}
-            style={[styles.input, { color: theme.colors.textPrimary }]}
-            multiline
-            maxLength={3000}
-            returnKeyType="default"
-          />
-        </View>
-
-        <Pressable
-          onPress={() => void handleSend()}
-          disabled={sending || !canSend}
-          style={styles.sendBtnWrap}
-        >
-          <LinearGradient
-            colors={
-              canSend
-                ? AppTheme.gradients.primary
-                : [theme.colors.border, theme.colors.border]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.sendBtn}
+          <Pressable
+            style={({ pressed }) => [
+              styles.composerIconButton,
+              pressed && styles.composerIconPressed,
+            ]}
           >
-            {sending ? (
-              <ActivityIndicator size="small" color={theme.colors.textInverted} />
-            ) : (
-              <SendHorizontal size={18} color={theme.colors.textInverted} strokeWidth={2} />
-            )}
-          </LinearGradient>
-        </Pressable>
+            <Paperclip
+              size={19}
+              color={theme.colors.composerIcon}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+
+          <View style={styles.inputWrap}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.emojiButton,
+                pressed && styles.composerIconPressed,
+              ]}
+            >
+              <Smile
+                size={18}
+                color={theme.colors.iconMuted}
+                strokeWidth={2.1}
+              />
+            </Pressable>
+            <TextInput
+              ref={inputRef}
+              value={messageText}
+              onChangeText={handleTextChange}
+              placeholder={
+                isGroup ? "Message the group..." : "Type a secure message..."
+              }
+              placeholderTextColor={theme.colors.placeholder}
+              style={styles.input}
+              multiline
+              maxLength={3000}
+              returnKeyType="default"
+              onFocus={() => setComposerFocused(true)}
+              onBlur={() => setComposerFocused(false)}
+            />
+          </View>
+
+          <Pressable
+            onPress={() => void handleSend()}
+            disabled={sending || !canSend}
+            style={({ pressed }) => [
+              styles.sendBtnWrap,
+              pressed && canSend && styles.sendPressed,
+              !canSend && styles.sendDisabled,
+            ]}
+          >
+            <LinearGradient
+              colors={
+                canSend
+                  ? theme.gradients.primary
+                  : theme.gradients.inactiveControl
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sendBtn}
+            >
+              {sending ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.textInverted}
+                />
+              ) : canSend ? (
+                <SendHorizontal
+                  size={19}
+                  color={theme.colors.textInverted}
+                  strokeWidth={2.5}
+                />
+              ) : (
+                <Mic
+                  size={19}
+                  color={theme.colors.iconMuted}
+                  strokeWidth={2.2}
+                />
+              )}
+            </LinearGradient>
+          </Pressable>
+        </BlurView>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const headerStyles = StyleSheet.create({
-  titleWrap: { maxWidth: "88%" },
-  title: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 16 },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 1,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: AppTheme.colors.success,
-  },
-  statusText: { fontFamily: "Manrope_500Medium", fontSize: 11 },
-  infoButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(37,99,235,0.08)",
-  },
-});
+function TypingDots({ compact = false }: { compact?: boolean }) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  messagesContent: {
-    paddingHorizontal: 10,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  loadingOlderWrap: { paddingVertical: 12, alignItems: "center" },
-  typingBubble: {
-    alignSelf: "flex-start",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginLeft: 10,
-    marginBottom: 8,
-    ...AppTheme.shadow.card,
-    elevation: 2,
-  },
-  typingDots: { flexDirection: "row", alignItems: "center" },
-  dot: { width: 7, height: 7, borderRadius: 3.5 },
-  // Input bar
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    ...AppTheme.shadow.floating,
-    elevation: 8,
-  },
-  attachBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  inputWrap: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    minHeight: 48,
-    justifyContent: "center",
-  },
-  input: {
-    fontFamily: "Manrope_500Medium",
-    fontSize: 15,
-    maxHeight: 100,
-    lineHeight: 22,
-  },
-  sendBtnWrap: {},
-  sendBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    ...AppTheme.shadow.floating,
-    elevation: 8,
-  },
-});
+  return (
+    <View style={[styles.typingDots, compact && styles.typingDotsCompact]}>
+      <View style={[styles.dot, compact && styles.dotCompact]} />
+      <View style={[styles.dot, compact && styles.dotCompact]} />
+      <View style={[styles.dot, compact && styles.dotCompact]} />
+    </View>
+  );
+}
+
+const createStyles = (theme: ReturnType<typeof useTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    background: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    topGlow: {
+      position: "absolute",
+      top: -92,
+      right: -62,
+      width: 210,
+      height: 210,
+      borderRadius: 105,
+      overflow: "hidden",
+      backgroundColor: theme.colors.glow,
+    },
+    bottomGlow: {
+      position: "absolute",
+      bottom: 56,
+      left: -80,
+      width: 190,
+      height: 190,
+      borderRadius: 95,
+      overflow: "hidden",
+      backgroundColor: theme.colors.glowSecondary,
+    },
+    header: {
+      paddingHorizontal: 8,
+      paddingBottom: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.headerBorder,
+      overflow: "hidden",
+      backgroundColor: theme.colors.header,
+    },
+    headerButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    headerButtonPressed: {
+      transform: [{ scale: 0.94 }],
+      backgroundColor: theme.colors.primaryLight,
+    },
+    headerIdentity: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    avatarShell: {
+      width: 38,
+      height: 38,
+      position: "relative",
+    },
+    avatar: {
+      width: 37,
+      height: 37,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: {
+      color: theme.colors.textInverted,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 14,
+    },
+    onlineDot: {
+      position: "absolute",
+      right: -1,
+      bottom: -1,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.colors.success,
+      borderWidth: 2,
+      borderColor: theme.colors.background,
+    },
+    headerTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    headerTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 14,
+      lineHeight: 19,
+    },
+    statusRow: {
+      marginTop: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    statusDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: theme.colors.success,
+    },
+    headerStatus: {
+      flex: 1,
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_600SemiBold",
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    typingStatus: {
+      color: theme.colors.teal,
+    },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    messagesContent: {
+      flexGrow: 1,
+      justifyContent: "flex-end",
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
+    loadingOlderWrap: {
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    dateSeparator: {
+      alignSelf: "center",
+      marginTop: 7,
+      marginBottom: 8,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    dateSeparatorText: {
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 10,
+      letterSpacing: 0.4,
+    },
+    typingRow: {
+      paddingHorizontal: 18,
+      marginBottom: 6,
+      alignItems: "flex-start",
+    },
+    typingBubble: {
+      borderRadius: 18,
+      borderTopLeftRadius: 7,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      backgroundColor: theme.colors.messageIncoming,
+      borderWidth: 1,
+      borderColor: theme.colors.messageIncomingBorder,
+    },
+    typingDots: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    typingDotsCompact: {
+      gap: 3,
+    },
+    dot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor: theme.colors.primary,
+      opacity: 0.72,
+    },
+    dotCompact: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+    },
+    emptyConversation: {
+      marginHorizontal: 28,
+      marginTop: "auto",
+      marginBottom: "auto",
+      alignItems: "center",
+    },
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    emptyTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 17,
+      marginBottom: 6,
+    },
+    emptyText: {
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_500Medium",
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
+    },
+    composerOuter: {
+      paddingHorizontal: 10,
+      paddingTop: 7,
+      backgroundColor: theme.colors.composer,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.divider,
+    },
+    composerBlur: {
+      minHeight: 57,
+      borderRadius: 23,
+      overflow: "hidden",
+      paddingHorizontal: 8,
+      paddingVertical: 7,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 7,
+      backgroundColor: theme.colors.composer,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadow.cardStrong,
+    },
+    composerFocused: {
+      borderColor: theme.colors.primaryMid,
+      backgroundColor: theme.colors.inputFocused,
+    },
+    composerIconButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    composerIconPressed: {
+      opacity: 0.72,
+      transform: [{ scale: 0.95 }],
+    },
+    inputWrap: {
+      flex: 1,
+      minHeight: 42,
+      maxHeight: 112,
+      borderRadius: 19,
+      paddingLeft: 10,
+      paddingRight: 12,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      backgroundColor: theme.colors.composerInput,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+    },
+    emojiButton: {
+      width: 28,
+      height: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 2,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_500Medium",
+      fontSize: 15,
+      lineHeight: 21,
+      minHeight: 39,
+      maxHeight: 104,
+      paddingTop: 9,
+      paddingBottom: 8,
+      paddingHorizontal: 0,
+      textAlignVertical: "center",
+    },
+    sendBtnWrap: {
+      borderRadius: 19,
+      shadowColor: theme.shadow.floating.shadowColor,
+      shadowOpacity: 0.2,
+      shadowRadius: 13,
+      shadowOffset: { width: 0, height: 7 },
+      elevation: 8,
+    },
+    sendPressed: {
+      transform: [{ scale: 0.92 }],
+    },
+    sendDisabled: {
+      shadowOpacity: 0,
+    },
+    sendBtn: {
+      width: 42,
+      height: 42,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });

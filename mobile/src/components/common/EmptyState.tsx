@@ -66,7 +66,7 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta, style, accentCo
       {/* Floating icon circle with glow */}
       <Animated.View style={iconStyle}>
         <LinearGradient
-          colors={accentColor ? [accentColor, accentColor] : ["#EFF6FF", "#DBEAFE"]}
+          colors={accentColor ? [accentColor, accentColor] : theme.gradients.primarySoft}
           style={[
             styles.iconCircle,
             {
@@ -94,12 +94,12 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta, style, accentCo
           ]}
         >
           <LinearGradient
-            colors={["#2563EB", "#06B6D4"]}
+            colors={theme.gradients.primary}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.ctaGrad}
           >
-            <Text style={styles.ctaText}>{ctaLabel}</Text>
+            <Text style={[styles.ctaText, { color: theme.colors.textInverted }]}>{ctaLabel}</Text>
           </LinearGradient>
         </Pressable>
       ) : null}
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: "Manrope_700Bold",
     fontSize: 14,
-    color: "#FFFFFF",
     letterSpacing: 0.2
   }
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AppState } from "react-native";
 
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
@@ -27,11 +28,16 @@ export const useSocketChat = () => {
   const fetchConversations = useChatStore((state) => state.fetchConversations);
   const upsertConversation = useChatStore((state) => state.upsertConversation);
   const removeConversation = useChatStore((state) => state.removeConversation);
+  const updateUserStatus = useChatStore((state) => state.updateUserStatus);
+  const markConversationMessagesRead = useChatStore((state) => state.markConversationMessagesRead);
+  const resendAllFailedMessages = useChatStore((state) => state.resendAllFailedMessages);
 
   // Use a ref so the reconnect callback can always access the latest fetchConversations
   // without re-registering the socket listener on every render
   const fetchConversationsRef = useRef(fetchConversations);
   fetchConversationsRef.current = fetchConversations;
+  const resendAllFailedMessagesRef = useRef(resendAllFailedMessages);
+  resendAllFailedMessagesRef.current = resendAllFailedMessages;
 
   useEffect(() => {
     if (!token) {
@@ -45,6 +51,7 @@ export const useSocketChat = () => {
     // On reconnect: refresh conversation list to pick up any missed messages
     setReconnectCallback(() => {
       void fetchConversationsRef.current();
+      void resendAllFailedMessagesRef.current();
     });
 
     const handleReceiveMessage = (payload: ReceiveMessagePayload) => {
@@ -65,16 +72,45 @@ export const useSocketChat = () => {
       removeConversation(conversationId);
     };
 
+    const handleUserStatusChanged = (payload: { userId: string; isOnline: boolean; lastSeen: string | null }) => {
+      updateUserStatus(payload);
+    };
+
+    const handleMessagesRead = (payload: { conversationId: string; userId: string }) => {
+      markConversationMessagesRead(payload.conversationId, payload.userId);
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("conversationUpdated", handleConversationUpdated);
     socket.on("conversationRemoved", handleConversationRemoved);
+    socket.on("userStatusChanged", handleUserStatusChanged);
+    socket.on("messagesRead", handleMessagesRead);
+
+    const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        if (socket.disconnected) {
+          socket.connect();
+        }
+      }
+    });
 
     return () => {
       const activeSocket = getSocket();
       activeSocket?.off("receiveMessage", handleReceiveMessage);
       activeSocket?.off("conversationUpdated", handleConversationUpdated);
       activeSocket?.off("conversationRemoved", handleConversationRemoved);
+      activeSocket?.off("userStatusChanged", handleUserStatusChanged);
+      activeSocket?.off("messagesRead", handleMessagesRead);
       setReconnectCallback(null);
+      appStateSubscription.remove();
     };
-  }, [appendIncomingMessage, removeConversation, token, upsertConversation]);
+  }, [
+    appendIncomingMessage,
+    removeConversation,
+    token,
+    upsertConversation,
+    updateUserStatus,
+    markConversationMessagesRead,
+    resendAllFailedMessages,
+  ]);
 };

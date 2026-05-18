@@ -76,7 +76,7 @@ export function FloatingInput({
         {/* Focus accent line at top */}
         {focused ? (
           <LinearGradient
-            colors={["#2563EB", "#06B6D4"]}
+            colors={theme.gradients.primary}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.focusLine}

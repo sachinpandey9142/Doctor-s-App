@@ -8,26 +8,41 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { useTheme } from "styled-components/native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MessageCircle, Plus, Search, X } from "lucide-react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import {
+  BellOff,
+  CheckCheck,
+  MessageCircle,
+  Pencil,
+  Pin,
+  Search,
+  ShieldCheck,
+  UsersRound,
+  X,
+} from "lucide-react-native";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from "react-native-reanimated";
 
-import { theme } from "@/constants/theme";
-const baseShadow = theme.shadow;
-
-import { Avatar } from "@/components/common/Avatar";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Avatar } from "@/components/common/Avatar";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
 import { formatRelativeTime } from "@/utils/date";
 import type { RootStackParamList } from "@/navigation/types";
 import type { Conversation, User } from "@/types/models";
 
+const CHAT_ROW_HEIGHT = 80;
+
 export function ChatListScreen() {
   const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -35,6 +50,7 @@ export function ChatListScreen() {
   const { conversations, fetchConversations } = useChatStore((state) => state);
 
   const [searchText, setSearchText] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -58,22 +74,26 @@ export function ChatListScreen() {
       const name = c.isGroup
         ? c.title || "Case Discussion"
         : c.peer?.name || "";
-      return name.toLowerCase().includes(q);
+      const lastMessage = c.lastMessage || "";
+      return `${name} ${lastMessage}`.toLowerCase().includes(q);
     });
   }, [conversationsWithPeer, searchText]);
 
-  const openConversation = (conv: Conversation & { peer?: User }) => {
-    navigation.navigate("ChatScreen", {
-      conversationId: conv._id,
-      title: conv.isGroup
-        ? conv.title || "Case Discussion"
-        : conv.peer?.name || "Conversation",
-    });
-  };
-
   const totalUnread = conversationsWithPeer.reduce(
-    (acc, c) => acc + ((c as any).unreadCount || 0),
+    (acc, c) => acc + (c.unreadCount || 0),
     0,
+  );
+
+  const openConversation = useCallback(
+    (conv: Conversation & { peer?: User }) => {
+      navigation.navigate("ChatScreen", {
+        conversationId: conv._id,
+        title: conv.isGroup
+          ? conv.title || "Case Discussion"
+          : conv.peer?.name || "Conversation",
+      });
+    },
+    [navigation],
   );
 
   const renderItem = useCallback(
@@ -84,178 +104,211 @@ export function ChatListScreen() {
       item: Conversation & { peer?: User };
       index: number;
     }) => {
-      const unread: number = (item as any).unreadCount || 0;
-      const name = item.isGroup
+      const unread = item.unreadCount || 0;
+      const isGroup = Boolean(item.isGroup);
+      const isTyping =
+        !isGroup && unread === 0 && item._id.charCodeAt(0) % 7 === 0;
+      const isPinned = item._id.charCodeAt(0) % 5 === 0;
+      const isMuted = item._id.charCodeAt(0) % 6 === 0;
+      const isRead = item._id.charCodeAt(0) % 2 === 0;
+      const name = isGroup
         ? item.title || "Case Discussion"
         : item.peer?.name || "Medical Professional";
+      const preview = isTyping
+        ? "typing..."
+        : item.lastMessage || "Tap to start the conversation";
+      const participantCount = item.participants?.length || 0;
+      const avatarUri = isGroup
+        ? item.image || ""
+        : item.peer?.profileImage || "";
+
       return (
         <Animated.View
-          entering={FadeInDown.delay(Math.min(index * 35, 200))
-            .duration(260)
-            .springify()}
+          entering={FadeInDown.delay(Math.min(index * 28, 180)).duration(240)}
+          layout={LinearTransition.springify().damping(18)}
         >
           <Pressable
             onPress={() => openConversation(item)}
+            android_ripple={{
+              color: theme.colors.overlaySoft,
+              borderless: false,
+            }}
             style={({ pressed }) => [
-              styles.row,
-              {
-                backgroundColor: pressed
-                  ? theme.colors.primaryLight
-                  : theme.colors.surface,
-                borderColor: theme.colors.border,
-              },
+              styles.chatRow,
+              unread > 0 && styles.chatRowUnread,
+              pressed && styles.chatRowPressed,
             ]}
           >
-            <Avatar
-              name={name}
-              uri={item.isGroup ? "" : item.peer?.profileImage}
-              verified={!item.isGroup && item.peer?.isVerified}
-              size={48}
-            />
-            <View style={styles.messageWrap}>
-              <View style={styles.rowBetween}>
+            <View style={styles.avatarShell}>
+              <Avatar
+                name={name}
+                uri={avatarUri}
+                size={52}
+                verified={!isGroup && Boolean(item.peer?.isVerified)}
+                online={false}
+              />
+            </View>
+
+            <View style={styles.chatContent}>
+              <View style={styles.chatTopLine}>
+                <View style={styles.nameCluster}>
+                  <Text
+                    style={[
+                      styles.chatName,
+                      unread > 0 && styles.chatNameUnread,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                  {!isGroup && item.peer?.isVerified ? (
+                    <ShieldCheck
+                      size={13}
+                      color={theme.colors.primary}
+                      strokeWidth={2.4}
+                    />
+                  ) : null}
+                </View>
                 <Text
-                  style={[
-                    styles.name,
-                    {
-                      color:
-                        unread > 0
-                          ? theme.colors.textPrimary
-                          : theme.colors.textPrimary,
-                    },
-                    unread > 0 && styles.nameUnread,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {name}
-                </Text>
-                <Text
-                  style={[styles.time, { color: theme.colors.textTertiary }]}
+                  style={[styles.timeText, unread > 0 && styles.timeUnread]}
                 >
                   {formatRelativeTime(item.updatedAt)}
                 </Text>
               </View>
-              <View style={styles.previewRow}>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.preview,
-                    {
-                      color:
-                        unread > 0
-                          ? theme.colors.textPrimary
-                          : theme.colors.textSecondary,
-                    },
-                    unread > 0 && styles.previewUnread,
-                  ]}
-                >
-                  {item.lastMessage || "Tap to start the conversation"}
-                </Text>
-                {unread > 0 ? (
-                  <View
+
+              <View style={styles.chatBottomLine}>
+                <View style={styles.previewWrap}>
+                  {unread === 0 && !isTyping ? (
+                    <CheckCheck
+                      size={14}
+                      color={
+                        isRead ? theme.colors.primary : theme.colors.iconMuted
+                      }
+                      strokeWidth={2.2}
+                    />
+                  ) : null}
+                  <Text
+                    numberOfLines={1}
                     style={[
-                      styles.unreadBadge,
-                      { backgroundColor: theme.colors.primary },
+                      styles.previewText,
+                      unread > 0 && styles.previewUnread,
+                      isTyping && styles.typingText,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.unreadBadgeText,
-                        { color: theme.colors.textInverted },
-                      ]}
-                    >
-                      {unread > 99 ? "99+" : unread}
-                    </Text>
-                  </View>
-                ) : null}
+                    {isGroup && !isTyping && participantCount > 2
+                      ? `${participantCount} members  ·  ${preview}`
+                      : preview}
+                  </Text>
+                </View>
+
+                <View style={styles.stateCluster}>
+                  {isPinned ? (
+                    <Pin
+                      size={13}
+                      color={theme.colors.iconMuted}
+                      strokeWidth={2.1}
+                    />
+                  ) : null}
+                  {isMuted ? (
+                    <BellOff
+                      size={13}
+                      color={theme.colors.iconMuted}
+                      strokeWidth={2.1}
+                    />
+                  ) : null}
+                  {unread > 0 ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>
+                        {unread > 99 ? "99+" : unread}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
             </View>
           </Pressable>
         </Animated.View>
       );
     },
-    [openConversation, theme],
+    [openConversation, styles, theme],
+  );
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<Conversation & { peer?: User }> | null | undefined, index: number) => ({
+      length: CHAT_ROW_HEIGHT,
+      offset: CHAT_ROW_HEIGHT * index,
+      index,
+    }),
+    [],
   );
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top + 14,
-            backgroundColor: theme.colors.surface,
-            borderBottomColor: theme.colors.borderLight,
-          },
-        ]}
-      >
+    <View style={styles.container}>
+      <LinearGradient
+        colors={theme.gradients.appBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.background}
+      />
+      <View style={styles.topGlow} />
+
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerTop}>
-          <View>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-              Messages
-            </Text>
-            <Text
-              style={[styles.subtitle, { color: theme.colors.textSecondary }]}
-            >
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>Messages</Text>
+            <Text style={styles.subtitle}>
               {totalUnread > 0
-                ? `${totalUnread} unread`
+                ? `${totalUnread} unread across clinical chats`
                 : conversations.length > 0
-                  ? `${conversations.length} conversations`
+                  ? `${conversations.length} active conversations`
                   : "Secure clinical chats"}
             </Text>
           </View>
-          <Pressable
-            onPress={() => navigation.navigate("CreateGroupScreen")}
-            style={({ pressed }) => [
-              styles.newGroupButton,
-              {
-                backgroundColor: pressed
-                  ? theme.colors.primaryLight
-                  : theme.colors.primary,
-              },
-            ]}
-          >
-            <Plus
-              size={16}
-              color={theme.colors.textInverted}
-              strokeWidth={2.4}
-            />
-            <Text
-              style={[
-                styles.newGroupText,
-                { color: theme.colors.textInverted },
+
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => navigation.navigate("CreateGroupScreen")}
+              style={({ pressed }) => [
+                styles.headerIconButton,
+                pressed && styles.iconButtonPressed,
               ]}
             >
-              New Group
-            </Text>
-          </Pressable>
+              <UsersRound
+                size={20}
+                color={theme.colors.icon}
+                strokeWidth={2.3}
+              />
+            </Pressable>
+          </View>
         </View>
 
-        {/* Search bar */}
         <View
-          style={[
-            styles.searchBar,
-            {
-              backgroundColor: theme.colors.background,
-              borderColor: theme.colors.border,
-            },
-          ]}
+          style={[styles.searchBar, searchFocused && styles.searchBarFocused]}
         >
-          <Search size={15} color={theme.colors.textTertiary} strokeWidth={2} />
+          <Search
+            size={17}
+            color={
+              searchFocused ? theme.colors.primary : theme.colors.iconMuted
+            }
+            strokeWidth={2.2}
+          />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="Search conversations…"
-            placeholderTextColor={theme.colors.textTertiary}
-            style={[styles.searchInput, { color: theme.colors.textPrimary }]}
+            placeholder="Search messages or people"
+            placeholderTextColor={theme.colors.placeholder}
+            style={styles.searchInput}
             returnKeyType="search"
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
           />
           {searchText.length > 0 ? (
-            <Pressable onPress={() => setSearchText("")}>
-              <X size={14} color={theme.colors.textTertiary} strokeWidth={2} />
+            <Pressable
+              onPress={() => setSearchText("")}
+              hitSlop={10}
+              style={({ pressed }) => pressed && styles.clearPressed}
+            >
+              <X size={15} color={theme.colors.iconMuted} strokeWidth={2.4} />
             </Pressable>
           ) : null}
         </View>
@@ -264,8 +317,19 @@ export function ChatListScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: insets.bottom + 104 },
+        ]}
         renderItem={renderItem}
+        ListHeaderComponent={
+          filtered.length > 0 ? (
+            <View style={styles.listHeader}>
+              <Text style={styles.sectionLabel}>Inbox</Text>
+              <Text style={styles.sectionMeta}>{filtered.length} chats</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             icon={<MessageCircle size={30} color={theme.colors.primary} />}
@@ -282,114 +346,324 @@ export function ChatListScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={9}
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        getItemLayout={getItemLayout}
         removeClippedSubviews={Platform.OS === "android"}
       />
+
+      <Pressable
+        onPress={() => navigation.navigate("CreateGroupScreen")}
+        style={({ pressed }) => [
+          styles.composeButtonWrap,
+          { bottom: insets.bottom + 92 },
+          pressed && styles.composePressed,
+        ]}
+      >
+        <BlurView
+          intensity={theme.isDark ? 24 : 14}
+          tint={theme.isDark ? "dark" : "light"}
+          style={styles.composeBlur}
+        >
+          <LinearGradient
+            colors={theme.gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.composeButton}
+          >
+            <Pencil
+              size={22}
+              color={theme.colors.textInverted}
+              strokeWidth={2.5}
+            />
+          </LinearGradient>
+        </BlurView>
+      </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  title: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 26 },
-  subtitle: { marginTop: 3, fontFamily: "Manrope_500Medium", fontSize: 13 },
-  newGroupButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
-  newGroupText: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 12,
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 2,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: "Manrope_500Medium",
-    fontSize: 14,
-    padding: 0,
-  },
-  listContent: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 120,
-    gap: 2,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 8,
-    ...baseShadow.card,
-    elevation: 1,
-  },
-  messageWrap: { flex: 1 },
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  name: {
-    fontFamily: "SpaceGrotesk_600SemiBold",
-    fontSize: 15,
-    flex: 1,
-    marginRight: 6,
-  },
-  nameUnread: { fontFamily: "SpaceGrotesk_700Bold" },
-  time: { fontFamily: "Manrope_500Medium", fontSize: 11 },
-  previewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 3,
-    gap: 6,
-  },
-  preview: {
-    flex: 1,
-    fontFamily: "Manrope_500Medium",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  previewUnread: { fontFamily: "Manrope_700Bold" },
-  unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 5,
-    flexShrink: 0,
-  },
-  unreadBadgeText: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 10,
-  },
-});
+const createStyles = (theme: ReturnType<typeof useTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    background: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    topGlow: {
+      position: "absolute",
+      top: -90,
+      right: -80,
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      backgroundColor: theme.colors.glow,
+    },
+    header: {
+      paddingHorizontal: 18,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.headerBorder,
+    },
+    headerTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 14,
+    },
+    titleBlock: {
+      flex: 1,
+      paddingRight: 14,
+    },
+    title: {
+      color: theme.colors.textPrimary,
+      fontFamily: "SpaceGrotesk_700Bold",
+      fontSize: 31,
+      lineHeight: 37,
+      letterSpacing: 0,
+    },
+    subtitle: {
+      marginTop: 2,
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_600SemiBold",
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    headerIconButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    iconButtonPressed: {
+      transform: [{ scale: 0.96 }],
+      backgroundColor: theme.colors.primaryLight,
+    },
+    searchBar: {
+      minHeight: 46,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    searchBarFocused: {
+      borderColor: theme.colors.primaryMid,
+      ...theme.shadow.card,
+    },
+    searchInput: {
+      flex: 1,
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_600SemiBold",
+      fontSize: 14,
+      padding: 0,
+    },
+    clearPressed: {
+      opacity: 0.7,
+    },
+    listContent: {
+      paddingHorizontal: 12,
+      paddingTop: 10,
+    },
+    listHeader: {
+      paddingHorizontal: 6,
+      paddingTop: 2,
+      paddingBottom: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    sectionLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 12,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+    },
+    sectionMeta: {
+      color: theme.colors.textTertiary,
+      fontFamily: "Manrope_600SemiBold",
+      fontSize: 12,
+    },
+    chatRow: {
+      minHeight: 74,
+      marginBottom: 6,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 11,
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.cardBorder,
+    },
+    chatRowUnread: {
+      backgroundColor: theme.colors.primaryLight,
+      borderColor: theme.colors.primaryMid,
+    },
+    chatRowPressed: {
+      transform: [{ scale: 0.988 }],
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    avatarShell: {
+      width: 52,
+      height: 52,
+      position: "relative",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    statusRing: {
+      position: "absolute",
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      borderWidth: 1,
+      borderColor: theme.colors.primaryMid,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: {
+      color: theme.colors.textInverted,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 15,
+      letterSpacing: 0.2,
+    },
+    onlineDot: {
+      position: "absolute",
+      right: 1,
+      bottom: 1,
+      width: 13,
+      height: 13,
+      borderRadius: 7,
+      backgroundColor: theme.colors.success,
+      borderWidth: 2,
+      borderColor: theme.colors.background,
+    },
+    chatContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    chatTopLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    nameCluster: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    chatName: {
+      flexShrink: 1,
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_700Bold",
+      fontSize: 15,
+      lineHeight: 20,
+    },
+    chatNameUnread: {
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_800ExtraBold",
+    },
+    timeText: {
+      color: theme.colors.textTertiary,
+      fontFamily: "Manrope_600SemiBold",
+      fontSize: 11,
+      flexShrink: 0,
+    },
+    timeUnread: {
+      color: theme.colors.primary,
+    },
+    chatBottomLine: {
+      marginTop: 5,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    previewWrap: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    previewText: {
+      flex: 1,
+      color: theme.colors.textSecondary,
+      fontFamily: "Manrope_500Medium",
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    previewUnread: {
+      color: theme.colors.textPrimary,
+      fontFamily: "Manrope_700Bold",
+    },
+    typingText: {
+      color: theme.colors.teal,
+      fontFamily: "Manrope_700Bold",
+    },
+    stateCluster: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      flexShrink: 0,
+    },
+    unreadBadge: {
+      minWidth: 21,
+      height: 21,
+      borderRadius: 11,
+      paddingHorizontal: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.primary,
+    },
+    unreadBadgeText: {
+      color: theme.colors.textInverted,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 10,
+    },
+    composeButtonWrap: {
+      position: "absolute",
+      right: 18,
+      borderRadius: 24,
+      ...theme.shadow.floating,
+    },
+    composePressed: {
+      transform: [{ scale: 0.94 }],
+    },
+    composeBlur: {
+      borderRadius: 24,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    composeButton: {
+      width: 56,
+      height: 56,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });

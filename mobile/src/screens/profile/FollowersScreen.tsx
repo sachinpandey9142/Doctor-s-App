@@ -331,7 +331,10 @@ export function FollowersScreen() {
           replace ? response.data : [...current, ...response.data],
         );
         setPage(response.pagination?.page ?? pageToLoad);
-        setHasMore(Boolean(response.pagination?.hasMore));
+        const pagination = response.pagination;
+        setHasMore(
+          pagination ? pagination.page < pagination.totalPages : false,
+        );
       } catch (error) {
         showToast("Could not load connections", "error");
         if (requestId !== requestIdRef.current) {

@@ -14,24 +14,14 @@ import { useToastStore, type ToastMessage, type ToastType } from "@/store/toastS
 /* ─── Colour tokens per type (theme-aware) ─────────────────────────── */
 function getToken(
   type: ToastType,
-  isDark: boolean,
+  theme: ReturnType<typeof useTheme>,
 ): { bg: string; border: string; icon: string } {
-  if (isDark) {
-    // Dark mode: deeper tinted surfaces, soft borders
-    const dark: Record<ToastType, { bg: string; border: string; icon: string }> = {
-      error:   { bg: "#2D1515", border: "#F87171", icon: "#F87171" },
-      success: { bg: "#0D2318", border: "#4ADE80", icon: "#4ADE80" },
-      info:    { bg: "#0D1E3B", border: "#60A5FA", icon: "#60A5FA" },
-    };
-    return dark[type];
-  }
-  // Light mode: soft tinted backgrounds
-  const light: Record<ToastType, { bg: string; border: string; icon: string }> = {
-    error:   { bg: "#FEF2F2", border: "#EF4444", icon: "#EF4444" },
-    success: { bg: "#F0FDF4", border: "#22C55E", icon: "#22C55E" },
-    info:    { bg: "#EFF6FF", border: "#2563EB", icon: "#2563EB" },
+  const tokens: Record<ToastType, { bg: string; border: string; icon: string }> = {
+    error: { bg: theme.colors.errorLight, border: theme.colors.error, icon: theme.colors.error },
+    success: { bg: theme.colors.successLight, border: theme.colors.success, icon: theme.colors.success },
+    info: { bg: theme.colors.primaryLight, border: theme.colors.primary, icon: theme.colors.primary },
   };
-  return light[type];
+  return tokens[type];
 }
 
 function ToastIcon({ type, color }: { type: ToastType; color: string }) {
@@ -46,9 +36,7 @@ function ToastIcon({ type, color }: { type: ToastType; color: string }) {
 function SingleToast({ toast }: { toast: ToastMessage }) {
   const dismiss = useToastStore((s) => s.dismissToast);
   const theme = useTheme();
-  // Detect dark mode by checking if background is dark
-  const isDark = theme.colors.background === "#0B1120" || theme.colors.surface === "#111827";
-  const t = getToken(toast.type, isDark);
+  const t = getToken(toast.type, theme);
 
   return (
     <Animated.View
@@ -60,7 +48,7 @@ function SingleToast({ toast }: { toast: ToastMessage }) {
         {
           backgroundColor: t.bg,
           borderColor: t.border,
-          shadowColor: isDark ? "#000" : "#0F172A",
+          shadowColor: theme.shadow.card.shadowColor,
         },
       ]}
     >

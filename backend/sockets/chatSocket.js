@@ -75,7 +75,14 @@ const initializeSocket = (httpServer) => {
       origin: "*",
       methods: ["GET", "POST"],
     },
+    pingInterval: 10000,
+    pingTimeout: 5000,
   });
+
+  // Track connected users: userId -> Set of socketIds
+  const connectedUsers = new Map();
+  // Track typing states: conversationId -> Set of userIds
+  const typingUsers = new Map();
 
   // ─── Auth middleware ─────────────────────────────────────────────────────────
   // Two-step verification:
@@ -111,8 +118,36 @@ const initializeSocket = (httpServer) => {
     }
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     socket.join(`user:${socket.userId}`);
+
+    // Track connection
+    if (!connectedUsers.has(socket.userId)) {
+      connectedUsers.set(socket.userId, new Set());
+    }
+    connectedUsers.get(socket.userId).add(socket.id);
+
+    // If this is their first connection, mark online
+    if (connectedUsers.get(socket.userId).size === 1) {
+      await User.findByIdAndUpdate(socket.userId, { isOnline: true });
+      io.emit("userStatusChanged", {
+        userId: socket.userId,
+        isOnline: true,
+        lastSeen: null,
+      });
+    }
+
+    socket.on("joinPoll", ({ postId }) => {
+      if (postId) {
+        socket.join(`poll:${postId}`);
+      }
+    });
+
+    socket.on("leavePoll", ({ postId }) => {
+      if (postId) {
+        socket.leave(`poll:${postId}`);
+      }
+    });
 
     socket.on("joinConversation", async ({ conversationId }) => {
       try {
@@ -163,7 +198,7 @@ const initializeSocket = (httpServer) => {
       }
     });
 
-    socket.on("typing", async ({ conversationId }) => {
+    socket.on("leaveConversation", async ({ conversationId }) => {
       try {
         const conversation = await Conversation.findOne({
           _id: conversationId,
@@ -173,6 +208,26 @@ const initializeSocket = (httpServer) => {
         if (!conversation) {
           return;
         }
+
+        socket.leave(String(conversationId));
+      } catch (_error) {
+        // Ignore transient leave errors.
+      }
+    });
+
+    socket.on("typing", async ({ conversationId }) => {
+      try {
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: socket.userId,
+        });
+
+        if (!conversation) return;
+
+        if (!typingUsers.has(conversationId)) {
+          typingUsers.set(conversationId, new Set());
+        }
+        typingUsers.get(conversationId).add(socket.userId);
 
         socket.to(String(conversationId)).emit("userTyping", {
           conversationId: String(conversationId),
@@ -192,8 +247,13 @@ const initializeSocket = (httpServer) => {
           participants: socket.userId,
         });
 
-        if (!conversation) {
-          return;
+        if (!conversation) return;
+
+        if (typingUsers.has(conversationId)) {
+          typingUsers.get(conversationId).delete(socket.userId);
+          if (typingUsers.get(conversationId).size === 0) {
+            typingUsers.delete(conversationId);
+          }
         }
 
         socket.to(String(conversationId)).emit("userTypingStopped", {
@@ -213,9 +273,7 @@ const initializeSocket = (httpServer) => {
           participants: socket.userId,
         });
 
-        if (!conversation) {
-          return;
-        }
+        if (!conversation) return;
 
         await Promise.all([
           Conversation.findByIdAndUpdate(conversationId, {
@@ -238,6 +296,12 @@ const initializeSocket = (httpServer) => {
           "conversationUpdated",
           toConversationPayload(updatedConversation, socket.userId),
         );
+        
+        // Notify others in the conversation that messages were read
+        socket.to(String(conversationId)).emit("messagesRead", {
+          conversationId: String(conversationId),
+          userId: socket.userId,
+        });
       } catch (_error) {
         // Ignore read-state issues on reconnect.
       }
@@ -248,6 +312,7 @@ const initializeSocket = (httpServer) => {
         const conversationId = String(payload?.conversationId || "").trim();
         const text = String(payload?.text || "").trim();
         const mediaUrl = String(payload?.mediaUrl || "").trim();
+        const tempId = String(payload?.tempId || "").trim();
 
         if (!conversationId) {
           throw new Error("conversationId is required");
@@ -271,6 +336,7 @@ const initializeSocket = (httpServer) => {
           senderId: socket.userId,
           text,
           mediaUrl,
+          tempId,
           readBy: [socket.userId],
         });
 
@@ -345,8 +411,121 @@ const initializeSocket = (httpServer) => {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("toggleMessageReaction", async (payload, ack) => {
+      try {
+        const { messageId, reaction = "heart" } = payload;
+        if (!messageId) throw new Error("messageId is required");
+
+        const message = await Message.findById(messageId);
+        if (!message) throw new Error("Message not found");
+
+        const currentReactions = message.reactions || new Map();
+        const users = currentReactions.get(reaction) || [];
+        const userIndex = users.findIndex(id => String(id) === String(socket.userId));
+
+        if (userIndex > -1) {
+          users.splice(userIndex, 1);
+        } else {
+          users.push(socket.userId);
+        }
+
+        if (users.length === 0) {
+          currentReactions.delete(reaction);
+        } else {
+          currentReactions.set(reaction, users);
+        }
+
+        message.reactions = currentReactions;
+        await message.save();
+
+        io.to(String(message.conversationId)).emit("messageReactionUpdated", {
+          conversationId: String(message.conversationId),
+          messageId: String(messageId),
+          reactions: currentReactions,
+        });
+
+        if (typeof ack === "function") ack({ success: true });
+      } catch (error) {
+        if (typeof ack === "function") {
+          ack({ success: false, message: error.message });
+        } else {
+          socket.emit("socketError", { message: error.message || "Failed to toggle reaction" });
+        }
+      }
+    });
+
+    socket.on("toggleMuteConversation", async ({ conversationId }, ack) => {
+      try {
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: socket.userId,
+        });
+
+        if (!conversation) throw new Error("Conversation not found");
+
+        const mutedBy = conversation.mutedBy || [];
+        const isMuted = mutedBy.includes(socket.userId);
+
+        if (isMuted) {
+          conversation.mutedBy = mutedBy.filter((id) => String(id) !== String(socket.userId));
+        } else {
+          conversation.mutedBy.push(socket.userId);
+        }
+
+        await conversation.save();
+
+        const updatedConversation = await Conversation.findById(conversationId)
+          .populate("participants", conversationSelect)
+          .populate("admins", conversationSelect)
+          .populate("createdBy", conversationSelect);
+
+        io.to(`user:${socket.userId}`).emit(
+          "conversationUpdated",
+          toConversationPayload(updatedConversation, socket.userId),
+        );
+
+        if (typeof ack === "function") ack({ success: true, isMuted: !isMuted });
+      } catch (error) {
+        if (typeof ack === "function") {
+          ack({ success: false, message: error.message });
+        } else {
+          socket.emit("socketError", { message: error.message || "Failed to toggle mute" });
+        }
+      }
+    });
+
+    socket.on("disconnect", async () => {
       socket.leave(`user:${socket.userId}`);
+      
+      const userSockets = connectedUsers.get(socket.userId);
+      if (userSockets) {
+        userSockets.delete(socket.id);
+        
+        if (userSockets.size === 0) {
+          connectedUsers.delete(socket.userId);
+          const lastSeen = new Date();
+          await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen });
+          
+          io.emit("userStatusChanged", {
+            userId: socket.userId,
+            isOnline: false,
+            lastSeen,
+          });
+
+          // Cleanup typing states
+          for (const [convId, users] of typingUsers.entries()) {
+            if (users.has(socket.userId)) {
+              users.delete(socket.userId);
+              if (users.size === 0) typingUsers.delete(convId);
+              io.to(convId).emit("userTypingStopped", {
+                conversationId: convId,
+                senderId: socket.userId,
+                isGroup: false, // fallback, not perfect but stops it
+              });
+            }
+          }
+        }
+      }
     });
   });
 

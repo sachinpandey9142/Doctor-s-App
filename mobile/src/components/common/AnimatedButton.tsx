@@ -81,11 +81,11 @@ export function AnimatedButton({
           ]}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={theme.colors.textInverted} />
           ) : (
             <>
               {icon}
-              <Text style={styles.primaryLabel}>{title}</Text>
+              <Text style={[styles.primaryLabel, { color: theme.colors.textInverted }]}>{title}</Text>
             </>
           )}
         </LinearGradient>
@@ -226,7 +226,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   primaryLabel: {
-    color: "#FFFFFF",
     fontFamily: "Manrope_700Bold",
     fontSize: 15,
     letterSpacing: 0.2,

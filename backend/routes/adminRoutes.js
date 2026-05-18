@@ -8,7 +8,8 @@ const {
   blockUser,
   unblockUser,
   getOrganizations,
-  deletePost
+  deletePost,
+  getReputationAnalytics,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -23,5 +24,7 @@ router.put("/users/:id/unblock", unblockUser);
 router.get("/organizations", getOrganizations);
 
 router.delete("/posts/:id", deletePost);
+
+router.get("/reputation/analytics", getReputationAnalytics);
 
 module.exports = router;

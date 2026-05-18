@@ -28,6 +28,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { Avatar } from "@/components/common/Avatar";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
+import { usePollStore } from "@/store/pollStore";
 import { hapticTap } from "@/utils/haptics";
 import { formatRelativeTime } from "@/utils/date";
 import type { Post } from "@/types/models";
@@ -83,25 +84,26 @@ export function CaseDetailScreen() {
   const { post } = route.params;
   const user = useAuthStore((s) => s.user);
   const joinCaseDiscussion = useChatStore((s) => s.joinCaseDiscussion);
+  const { polls, fetchPoll, castVote, joinPollSync, leavePollSync } = usePollStore();
+
+  const poll = polls[post._id];
+
+  useEffect(() => {
+    if (post.type === "case") {
+      fetchPoll(post._id);
+      joinPollSync(post._id);
+      return () => {
+        leavePollSync(post._id);
+      };
+    }
+  }, [post._id, post.type]);
 
   const [joining, setJoining] = useState(false);
-  const [votedOption, setVotedOption] = useState<number | null>(null);
 
-  // Demo vote counts — in a real app these come from the backend
-  const [voteCounts, setVoteCounts] = useState([14, 8, 22, 5]);
-  const DIAGNOSIS_OPTIONS = [
-    "Bacterial Pneumonia",
-    "Viral Infection (COVID-19)",
-    "Atypical Pneumonia",
-    "Pulmonary Embolism"
-  ];
-  const totalVotes = voteCounts.reduce((a, b) => a + b, 0);
-
-  const handleVote = (index: number) => {
-    if (votedOption !== null) return;
+  const handleVote = (optionId: string) => {
+    if (poll?.votedOptionId) return;
     hapticTap();
-    setVotedOption(index);
-    setVoteCounts((prev) => prev.map((v, i) => i === index ? v + 1 : v));
+    castVote(post._id, optionId);
   };
 
   const isAnonymous = post.isAnonymous && post.type === "case";
@@ -229,28 +231,28 @@ export function CaseDetailScreen() {
         </Animated.View>
 
         {/* Vote Diagnosis Poll */}
+        {poll ? (
         <Animated.View entering={FadeInDown.delay(170).duration(280).springify()} style={[styles.pollCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionIconWrap, { backgroundColor: "#EFF6FF" }]}>
               <CheckCircle size={13} color="#2563EB" />
             </View>
             <Text style={styles.sectionTitle}>Vote Diagnosis</Text>
-            {votedOption !== null ? (
+            {poll.votedOptionId !== null ? (
               <View style={[styles.pollVotedBadge, { backgroundColor: "#EFF6FF" }]}>
-                <Text style={[styles.pollVotedText, { color: "#2563EB" }]}>{totalVotes} votes</Text>
+                <Text style={[styles.pollVotedText, { color: "#2563EB" }]}>{poll.totalVotes} votes</Text>
               </View>
             ) : (
               <Text style={[styles.pollHint, { color: theme.colors.textTertiary }]}>Tap to vote</Text>
             )}
           </View>
-          {DIAGNOSIS_OPTIONS.map((option, i) => {
-            const isVoted = votedOption === i;
-            const pct = totalVotes > 0 ? Math.round((voteCounts[i] / totalVotes) * 100) : 0;
+          {poll.options.map((opt) => {
+            const isVoted = poll.votedOptionId === opt._id;
             return (
               <Pressable
-                key={i}
-                onPress={() => handleVote(i)}
-                disabled={votedOption !== null}
+                key={opt._id}
+                onPress={() => handleVote(opt._id)}
+                disabled={!!poll.votedOptionId || poll.isClosed}
                 style={({ pressed }) => [
                   styles.pollOption,
                   { borderColor: isVoted ? "#2563EB" : theme.colors.border, backgroundColor: isVoted ? "#EFF6FF" : (pressed ? theme.colors.background : theme.colors.surface) }
@@ -258,20 +260,21 @@ export function CaseDetailScreen() {
               >
                 <View style={styles.pollOptionTop}>
                   <View style={[styles.pollDot, { borderColor: isVoted ? "#2563EB" : theme.colors.border, backgroundColor: isVoted ? "#2563EB" : "transparent" }]} />
-                  <Text style={[styles.pollOptionText, { color: isVoted ? "#2563EB" : theme.colors.textPrimary }]} numberOfLines={1}>{option}</Text>
-                  {votedOption !== null ? (
-                    <Text style={[styles.pollPct, { color: isVoted ? "#2563EB" : theme.colors.textTertiary }]}>{pct}%</Text>
+                  <Text style={[styles.pollOptionText, { color: isVoted ? "#2563EB" : theme.colors.textPrimary }]} numberOfLines={1}>{opt.label}</Text>
+                  {poll.votedOptionId !== null ? (
+                    <Text style={[styles.pollPct, { color: isVoted ? "#2563EB" : theme.colors.textTertiary }]}>{opt.pct}%</Text>
                   ) : null}
                 </View>
-                {votedOption !== null ? (
+                {poll.votedOptionId !== null ? (
                   <View style={[styles.pollBarBg, { backgroundColor: theme.colors.border }]}>
-                    <View style={[styles.pollBarFill, { width: `${pct}%`, backgroundColor: isVoted ? "#2563EB" : theme.colors.textTertiary }]} />
+                    <View style={[styles.pollBarFill, { width: `${opt.pct}%`, backgroundColor: isVoted ? "#2563EB" : theme.colors.textTertiary }]} />
                   </View>
                 ) : null}
               </Pressable>
             );
           })}
         </Animated.View>
+        ) : null}
 
         {/* Report Images */}
         {post.reportImages && post.reportImages.length > 1 ? (

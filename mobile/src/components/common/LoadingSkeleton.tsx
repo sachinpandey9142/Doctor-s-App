@@ -40,8 +40,7 @@ export function LoadingSkeleton({ height = 14, width = "100%", borderRadius = 10
     ]
   }));
 
-  const isDark = theme.colors.background !== "#F8FAFC";
-  const shimmerColors = isDark
+  const shimmerColors = theme.isDark
     ? ["rgba(255,255,255,0)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)"]
     : ["rgba(255,255,255,0)", "rgba(255,255,255,0.85)", "rgba(255,255,255,0)"];
 

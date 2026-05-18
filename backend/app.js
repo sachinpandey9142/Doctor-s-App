@@ -6,6 +6,7 @@ const cloudinary = require("cloudinary").v2;
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
+const pollRoutes = require("./routes/pollRoutes");
 const storyRoutes = require("./routes/storyRoutes");
 const memoryRoutes = require("./routes/memoryRoutes");
 const jobRoutes = require("./routes/jobRoutes");
@@ -13,6 +14,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const reputationRoutes = require("./routes/reputationRoutes");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
 
 // Configure Cloudinary from environment variables.
@@ -51,6 +53,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/posts", pollRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/memories", memoryRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -58,6 +61,7 @@ app.use("/api", chatRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reputation", reputationRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

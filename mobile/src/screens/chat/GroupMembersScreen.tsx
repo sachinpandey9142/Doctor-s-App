@@ -15,6 +15,7 @@ import type { RouteProp } from "@react-navigation/native";
 import { useTheme } from "styled-components/native";
 import {
   ArrowRight,
+  ChevronLeft,
   Plus,
   RefreshCcw,
   Shield,

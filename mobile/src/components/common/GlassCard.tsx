@@ -1,11 +1,11 @@
 import React from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "styled-components/native";
 
 interface GlassCardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   /** Pad the inner content. Default true. Set false for custom-padded cards. */
   padded?: boolean;
   /** Apply a subtle top-edge gradient accent line. Defaults to false. */
@@ -19,7 +19,6 @@ export function GlassCard({
   accent = false,
 }: GlassCardProps) {
   const theme = useTheme();
-  const isDark = theme.colors.background !== "#F8FAFC";
 
   return (
     <View
@@ -27,20 +26,16 @@ export function GlassCard({
         styles.container,
         {
           borderColor: theme.colors.cardBorder,
-          borderWidth: isDark ? 1 : 0,
-          backgroundColor: theme.colors.surface,
-          shadowColor: isDark ? "#000000" : "#0F172A",
-          shadowOffset: { width: 0, height: isDark ? 8 : 4 },
-          shadowOpacity: isDark ? 0.32 : 0.08,
-          shadowRadius: isDark ? 24 : 12,
-          elevation: isDark ? 8 : 3,
+          borderWidth: 1,
+          backgroundColor: theme.colors.card,
+          ...theme.shadow.card,
         },
         style,
       ]}
     >
       {accent ? (
         <LinearGradient
-          colors={["#2563EB", "#06B6D4"]}
+          colors={theme.gradients.primary}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.accentLine}

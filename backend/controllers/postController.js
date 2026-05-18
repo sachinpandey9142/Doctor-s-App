@@ -6,6 +6,8 @@ const { createNotification } = require("../services/notificationService");
 const {
   ReputationEvents,
   increaseReputation,
+  processWeightedVote,
+  checkAndAwardBadges,
 } = require("../services/reputationService");
 
 const getPagination = (query) => {
@@ -162,7 +164,11 @@ const likePost = catchAsync(async (req, res) => {
     post.likes.push(req.user._id);
 
     if (String(post.userId) !== String(req.user._id)) {
-      await increaseReputation(post.userId, ReputationEvents.POST_LIKED);
+      // Use weighted voting system
+      const category = post.type === "case" ? "case-discussion" : "general";
+      await processWeightedVote(
+        req.user._id, "Post", post._id, post.userId, "up", category
+      );
       await createNotification({
         userId: post.userId,
         type: "like",
@@ -171,6 +177,8 @@ const likePost = catchAsync(async (req, res) => {
         referenceId: String(post._id),
         triggerUserId: req.user._id,
       });
+      // Check for new badge eligibility
+      checkAndAwardBadges(post.userId).catch(() => {});
     }
   }
 
@@ -359,9 +367,11 @@ const likeComment = catchAsync(async (req, res) => {
   } else {
     comment.likes.push(req.user._id);
 
-    // Notify comment author of like
+    // Notify comment author of like with weighted voting
     if (String(comment.userId) !== String(req.user._id)) {
-      await increaseReputation(comment.userId, ReputationEvents.COMMENT_LIKED);
+      await processWeightedVote(
+        req.user._id, "Comment", comment._id, comment.userId, "up", "general"
+      );
       await createNotification({
         userId: comment.userId,
         type: "like",
@@ -370,6 +380,7 @@ const likeComment = catchAsync(async (req, res) => {
         referenceId: String(comment.postId),
         triggerUserId: req.user._id,
       });
+      checkAndAwardBadges(comment.userId).catch(() => {});
     }
   }
 

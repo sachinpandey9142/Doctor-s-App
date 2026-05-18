@@ -7,6 +7,8 @@ const bcrypt = require("bcrypt");
 const User = require("./models/User");
 const Post = require("./models/Post");
 const Comment = require("./models/Comment");
+const DiagnosisPoll = require("./models/DiagnosisPoll");
+const PollVote = require("./models/PollVote");
 
 // Healthcare avatar URLs
 const DOCTOR_AVATARS = [
@@ -550,6 +552,8 @@ const seedHealthcareData = async () => {
     console.log("Clearing old non-admin users and posts...");
     await Post.deleteMany({});
     await Comment.deleteMany({});
+    await DiagnosisPoll.deleteMany({});
+    await PollVote.deleteMany({});
     await User.deleteMany({ role: { $ne: "admin" } });
 
     console.log("Generating realistic healthcare users...");
@@ -598,6 +602,42 @@ const seedHealthcareData = async () => {
         commentCount: 0,
         isAnonymous: false,
       });
+
+      if (post.type === "case") {
+        const baseOptions = [
+          "Bacterial Pneumonia",
+          "Viral Infection",
+          "Pulmonary Embolism",
+          "Ischemic Stroke",
+          "Hemorrhagic Stroke"
+        ];
+        
+        // Randomly pick 3-4 options
+        const shuffled = baseOptions.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 4);
+
+        const poll = await DiagnosisPoll.create({
+          postId: post._id,
+          options: selected.map(label => ({ label, voteCount: 0 })),
+          totalVotes: 0,
+        });
+
+        // Add some random votes
+        const pollVoters = pickUniqueUsers(createdUsers, Math.floor(Math.random() * 10) + 5, []);
+        for (const voter of pollVoters) {
+          const randomOpt = poll.options[Math.floor(Math.random() * poll.options.length)];
+          
+          await PollVote.create({
+            userId: voter._id,
+            postId: post._id,
+            optionId: randomOpt._id
+          });
+          
+          randomOpt.voteCount += 1;
+          poll.totalVotes += 1;
+        }
+        await poll.save();
+      }
 
       // Add variation if it's a repeated blueprint
       if (i >= POST_BLUEPRINTS.length) {
