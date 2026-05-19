@@ -11,6 +11,7 @@ interface CreatePostPayload {
   content: string;
   mediaUrl?: string;
   type?: "text" | "image" | "video" | "case";
+  visibility?: "public" | "connections" | "private";
   symptoms?: string;
   observations?: string;
   reportImages?: string[];

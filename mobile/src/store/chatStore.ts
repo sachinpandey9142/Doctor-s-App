@@ -13,6 +13,10 @@ import { useToastStore, extractErrorMessage } from "@/store/toastStore";
 import { getSocket } from "@/services/socket/socketClient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuthStore } from "@/store/authStore";
+import {
+  attachPeerToConversation,
+  attachPeerToConversations,
+} from "@/utils/identityResolver";
 import type { ReceiveMessagePayload } from "@/services/socket/socketClient";
 import type { Conversation, Message } from "@/types/models";
 
@@ -30,6 +34,7 @@ interface ChatState {
   paginationByConversation: Record<string, ConversationPagination>;
   loadingConversations: boolean;
   loadingMessages: boolean;
+  loadingHeadersByConversation: Record<string, boolean>;
   drafts: Record<string, string>;
   isHydrated: boolean;
   hydrateDrafts: () => Promise<void>;
@@ -66,8 +71,15 @@ interface ChatState {
   appendIncomingMessage: (payload: ReceiveMessagePayload) => void;
   upsertConversation: (conversation: Conversation) => void;
   removeConversation: (conversationId: string) => void;
-  updateUserStatus: (payload: { userId: string; isOnline: boolean; lastSeen: string | null }) => void;
-  markConversationMessagesRead: (conversationId: string, userId: string) => void;
+  updateUserStatus: (payload: {
+    userId: string;
+    isOnline: boolean;
+    lastSeen: string | null;
+  }) => void;
+  markConversationMessagesRead: (
+    conversationId: string,
+    userId: string,
+  ) => void;
 }
 
 const sortConversations = (items: Conversation[]) =>
@@ -77,7 +89,13 @@ const sortConversations = (items: Conversation[]) =>
 
 const mergeMessages = (existing: Message[], incoming: Message[]): Message[] => {
   const byId = new Map<string, Message>();
-  [...incoming, ...existing].forEach((m) => byId.set(m._id, m));
+  [...incoming, ...existing].forEach((m) => {
+    if (!m || !m._id || !m.senderId) {
+      return;
+    }
+
+    byId.set(m._id, m);
+  });
   return Array.from(byId.values()).sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
@@ -89,6 +107,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   paginationByConversation: {},
   loadingConversations: false,
   loadingMessages: false,
+  loadingHeadersByConversation: {},
   drafts: {},
   isHydrated: false,
 
@@ -113,7 +132,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       } else {
         newDrafts[conversationId] = text;
       }
-      AsyncStorage.setItem("doctors-app-chat-drafts", JSON.stringify(newDrafts)).catch(() => {});
+      AsyncStorage.setItem(
+        "doctors-app-chat-drafts",
+        JSON.stringify(newDrafts),
+      ).catch(() => {});
       return { drafts: newDrafts };
     });
   },
@@ -124,7 +146,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const conversations = await getConversationsRequest();
       set({
-        conversations: sortConversations(conversations),
+        conversations: sortConversations(
+          attachPeerToConversations(
+            conversations,
+            useAuthStore.getState().user?._id,
+          ),
+        ),
         loadingConversations: false,
       });
     } catch (error) {
@@ -139,7 +166,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   openOrCreateConversation: async (participantId) => {
-    const conversation = await createConversationRequest(participantId);
+    const raw = await createConversationRequest(participantId);
+    const conversation = attachPeerToConversation(
+      raw,
+      useAuthStore.getState().user?._id,
+    );
 
     set((state) => {
       const exists = state.conversations.find(
@@ -158,7 +189,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createGroupConversation: async (payload) => {
-    const conversation = await createGroupConversationRequest(payload);
+    const raw = await createGroupConversationRequest(payload);
+    const conversation = attachPeerToConversation(
+      raw,
+      useAuthStore.getState().user?._id,
+    );
 
     set((state) => {
       const exists = state.conversations.find(
@@ -177,7 +212,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   joinCaseDiscussion: async (postId) => {
-    const conversation = await joinCaseChatRequest(postId);
+    const raw = await joinCaseChatRequest(postId);
+    const conversation = attachPeerToConversation(
+      raw,
+      useAuthStore.getState().user?._id,
+    );
 
     set((state) => {
       const exists = state.conversations.find(
@@ -195,8 +234,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return conversation;
   },
 
-  getConversation: async (conversationId) =>
-    getConversationRequest(conversationId),
+  getConversation: async (conversationId) => {
+    set((state) => ({
+      loadingHeadersByConversation: {
+        ...state.loadingHeadersByConversation,
+        [conversationId]: true,
+      },
+    }));
+    try {
+      const raw = await getConversationRequest(conversationId);
+      const conversation = attachPeerToConversation(
+        raw,
+        useAuthStore.getState().user?._id,
+      );
+      set((state) => {
+        const exists = state.conversations.some(
+          (item) => item._id === conversation._id,
+        );
+        const merged = exists
+          ? state.conversations.map((item) =>
+              item._id === conversation._id ? conversation : item,
+            )
+          : [conversation, ...state.conversations];
+
+        return {
+          conversations: sortConversations(merged),
+          loadingHeadersByConversation: {
+            ...state.loadingHeadersByConversation,
+            [conversationId]: false,
+          },
+        };
+      });
+      return conversation;
+    } catch (error) {
+      set((state) => ({
+        loadingHeadersByConversation: {
+          ...state.loadingHeadersByConversation,
+          [conversationId]: false,
+        },
+      }));
+      throw error;
+    }
+  },
 
   fetchMessages: async (conversationId) => {
     set({ loadingMessages: true });
@@ -312,7 +391,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messagesByConversation: {
         ...state.messagesByConversation,
-        [conversationId]: [optimisticMessage, ...(state.messagesByConversation[conversationId] || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), // assuming reverse order
+        [conversationId]: [
+          optimisticMessage,
+          ...(state.messagesByConversation[conversationId] || []),
+        ].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ), // assuming reverse order
       },
       conversations: sortConversations(
         state.conversations.map((conversation) =>
@@ -336,24 +421,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       set((state) => {
-        const currentMessages = state.messagesByConversation[conversationId] || [];
+        const currentMessages =
+          state.messagesByConversation[conversationId] || [];
         return {
           messagesByConversation: {
             ...state.messagesByConversation,
-            [conversationId]: currentMessages.map(msg => 
-              msg._id === tempId ? { ...message, status: "sent" } : msg
+            [conversationId]: currentMessages.map((msg) =>
+              msg._id === tempId ? { ...message, status: "sent" } : msg,
             ),
           },
         };
       });
     } catch (error) {
       set((state) => {
-        const currentMessages = state.messagesByConversation[conversationId] || [];
+        const currentMessages =
+          state.messagesByConversation[conversationId] || [];
         return {
           messagesByConversation: {
             ...state.messagesByConversation,
-            [conversationId]: currentMessages.map(msg => 
-              msg._id === tempId ? { ...msg, status: "failed" } : msg
+            [conversationId]: currentMessages.map((msg) =>
+              msg._id === tempId ? { ...msg, status: "failed" } : msg,
             ),
           },
         };
@@ -367,16 +454,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
   resendMessage: async (conversationId, tempId) => {
     const state = get();
     const currentMessages = state.messagesByConversation[conversationId] || [];
-    const failedMsg = currentMessages.find(m => m._id === tempId);
+    const failedMsg = currentMessages.find((m) => m._id === tempId);
     if (!failedMsg || failedMsg.status !== "failed") return;
 
     set((state) => {
-      const currentMessages = state.messagesByConversation[conversationId] || [];
+      const currentMessages =
+        state.messagesByConversation[conversationId] || [];
       return {
         messagesByConversation: {
           ...state.messagesByConversation,
-          [conversationId]: currentMessages.map(msg => 
-            msg._id === tempId ? { ...msg, status: "pending" } : msg
+          [conversationId]: currentMessages.map((msg) =>
+            msg._id === tempId ? { ...msg, status: "pending" } : msg,
           ),
         },
       };
@@ -391,38 +479,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       set((state) => {
-        const currentMessages = state.messagesByConversation[conversationId] || [];
+        const currentMessages =
+          state.messagesByConversation[conversationId] || [];
         return {
           messagesByConversation: {
             ...state.messagesByConversation,
-            [conversationId]: currentMessages.map(msg => 
-              msg._id === tempId ? { ...message, status: "sent" } : msg
+            [conversationId]: currentMessages.map((msg) =>
+              msg._id === tempId ? { ...message, status: "sent" } : msg,
             ),
           },
         };
       });
     } catch (error) {
       set((state) => {
-        const currentMessages = state.messagesByConversation[conversationId] || [];
+        const currentMessages =
+          state.messagesByConversation[conversationId] || [];
         return {
           messagesByConversation: {
             ...state.messagesByConversation,
-            [conversationId]: currentMessages.map(msg => 
-              msg._id === tempId ? { ...msg, status: "failed" } : msg
+            [conversationId]: currentMessages.map((msg) =>
+              msg._id === tempId ? { ...msg, status: "failed" } : msg,
             ),
           },
         };
       });
-      useToastStore
-        .getState()
-        .showToast("Message failed again.", "error");
+      useToastStore.getState().showToast("Message failed again.", "error");
     }
   },
 
   resendAllFailedMessages: async () => {
     const state = get();
-    for (const [conversationId, messages] of Object.entries(state.messagesByConversation)) {
-      const failedMessages = messages.filter(m => m.status === "failed");
+    for (const [conversationId, messages] of Object.entries(
+      state.messagesByConversation,
+    )) {
+      const failedMessages = messages.filter((m) => m.status === "failed");
       for (const failedMsg of failedMessages) {
         if (failedMsg.tempId) {
           await get().resendMessage(conversationId, failedMsg.tempId);
@@ -435,10 +525,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messagesByConversation: {
         ...state.messagesByConversation,
-        [conversationId]: (state.messagesByConversation[conversationId] || []).filter(
-          m => m._id !== tempId
-        ),
-      }
+        [conversationId]: (
+          state.messagesByConversation[conversationId] || []
+        ).filter((m) => m._id !== tempId),
+      },
     }));
   },
 
@@ -449,7 +539,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Optimistic Update
     set((state) => {
       const messages = state.messagesByConversation[conversationId] || [];
-      const updatedMessages = messages.map(msg => {
+      const updatedMessages = messages.map((msg) => {
         if (msg._id !== messageId) return msg;
 
         const currentReactions = msg.reactions ? { ...msg.reactions } : {};
@@ -477,7 +567,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesByConversation: {
           ...state.messagesByConversation,
           [conversationId]: updatedMessages,
-        }
+        },
       };
     });
 
@@ -487,21 +577,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
   updateMessageReactions: (conversationId, messageId, reactions) => {
     set((state) => {
       const messages = state.messagesByConversation[conversationId] || [];
-      const exists = messages.some(m => m._id === messageId);
+      const exists = messages.some((m) => m?._id === messageId);
       if (!exists) return state;
 
       return {
         messagesByConversation: {
           ...state.messagesByConversation,
-          [conversationId]: messages.map(msg => 
-            msg._id === messageId ? { ...msg, reactions } : msg
-          )
-        }
+          [conversationId]: messages.map((msg) =>
+            msg?._id === messageId ? { ...msg, reactions } : msg,
+          ),
+        },
       };
     });
   },
 
-  upsertConversation: (conversation) => {
+  upsertConversation: (raw) => {
+    const conversation = attachPeerToConversation(
+      raw,
+      useAuthStore.getState().user?._id,
+    );
     set((state) => {
       const exists = state.conversations.some(
         (item) => item._id === conversation._id,
@@ -535,25 +629,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   appendIncomingMessage: ({ conversationId, message }) => {
+    if (!message || !message._id || !message.senderId) {
+      return;
+    }
+
     set((state) => {
       const currentMessages =
         state.messagesByConversation[conversationId] || [];
-      const exists = currentMessages.some((item) => item._id === message._id);
-      
+      const exists = currentMessages.some((item) => item?._id === message._id);
+
       let nextMessages = currentMessages;
-      
+
       if (!exists) {
         // If it's our own message coming back via socket, it might have a tempId we can use to replace the pending one
-        const tempIdExists = message.tempId && currentMessages.some(item => item.tempId === message.tempId || item._id === message.tempId);
-        
+        const tempIdExists =
+          message.tempId &&
+          currentMessages.some(
+            (item) =>
+              item?.tempId === message.tempId || item?._id === message.tempId,
+          );
+
         if (tempIdExists) {
-          nextMessages = currentMessages.map(item => 
-            (item.tempId === message.tempId || item._id === message.tempId) ? { ...message, status: "sent" } : item
+          nextMessages = currentMessages.map((item) =>
+            item?.tempId === message.tempId || item?._id === message.tempId
+              ? { ...message, status: "sent" }
+              : item,
           );
         } else {
           nextMessages = [message, ...currentMessages];
         }
       }
+
+      const nextConversations = state.conversations.map((conversation) =>
+        conversation._id === conversationId
+          ? {
+              ...conversation,
+              lastMessage: message.text || "Sent an attachment",
+              updatedAt: message.createdAt,
+              unreadCount: conversation.unreadCount ?? 0,
+            }
+          : conversation,
+      );
 
       return {
         messagesByConversation: {
@@ -561,15 +677,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [conversationId]: nextMessages,
         },
         conversations: sortConversations(
-          state.conversations.map((conversation) =>
-            conversation._id === conversationId
-              ? {
-                  ...conversation,
-                  lastMessage: message.text || "Sent an attachment",
-                  updatedAt: message.createdAt,
-                  unreadCount: conversation.unreadCount ?? 0,
-                }
-              : conversation,
+          attachPeerToConversations(
+            nextConversations,
+            useAuthStore.getState().user?._id,
           ),
         ),
       };
@@ -577,25 +687,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   updateUserStatus: ({ userId, isOnline, lastSeen }) => {
-    set((state) => ({
-      conversations: state.conversations.map((conv) => {
-        const isParticipant = conv.participants?.some(p => p._id === userId);
+    set((state) => {
+      const nextConversations = state.conversations.map((conv) => {
+        const isParticipant = conv.participants?.some((p) => p._id === userId);
         if (!isParticipant) return conv;
 
         return {
           ...conv,
-          participants: conv.participants.map(p => 
-            p._id === userId ? { ...p, isOnline, lastSeen: lastSeen || undefined } : p
-          )
+          participants: conv.participants.map((p) =>
+            p._id === userId
+              ? { ...p, isOnline, lastSeen: lastSeen || undefined }
+              : p,
+          ),
         };
-      })
-    }));
+      });
+
+      return {
+        conversations: attachPeerToConversations(
+          nextConversations,
+          useAuthStore.getState().user?._id,
+        ),
+      };
+    });
   },
 
   markConversationMessagesRead: (conversationId, userId) => {
     set((state) => {
-      const currentMessages = state.messagesByConversation[conversationId] || [];
-      const updatedMessages = currentMessages.map(msg => {
+      const currentMessages =
+        state.messagesByConversation[conversationId] || [];
+      const updatedMessages = currentMessages.map((msg) => {
         if (msg.senderId._id !== userId && !msg.readBy?.includes(userId)) {
           return { ...msg, readBy: [...(msg.readBy || []), userId] };
         }
@@ -606,7 +726,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesByConversation: {
           ...state.messagesByConversation,
           [conversationId]: updatedMessages,
-        }
+        },
       };
     });
   },

@@ -9,7 +9,7 @@ const { createNotification } = require("../services/notificationService");
 const buildParticipantsHash = (idA, idB) =>
   [String(idA), String(idB)].sort().join(":");
 const conversationSelect =
-  "name profileImage role isVerified specialization hospital experience reputationScore followers following createdAt";
+  "name profileImage role isVerified specialization hospital experience reputationScore followers following createdAt isOnline lastSeen";
 
 const populateConversation = async (conversationId) => {
   let conversation = await Conversation.findById(conversationId);
@@ -430,10 +430,11 @@ const sendMessage = catchAsync(async (req, res) => {
       message: hydratedMessage,
     });
 
+    const populatedConversation = await populateConversation(conversation._id);
     broadcastConversationUpdate(
       io,
-      conversation,
-      conversationParticipantIds(conversation),
+      populatedConversation,
+      conversationParticipantIds(populatedConversation),
     );
   }
 

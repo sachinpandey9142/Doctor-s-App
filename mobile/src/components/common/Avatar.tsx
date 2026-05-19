@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useTheme } from "styled-components/native";
@@ -15,8 +15,6 @@ interface AvatarProps {
   loading?: boolean;
 }
 
-type AvatarLoadState = "idle" | "loading" | "loaded" | "error";
-
 // 8 vibrant but not garish pastel backgrounds — deterministic by initial
 const PALETTE = [
   { bg: "#DBEAFE", text: "#1D4ED8" }, // blue
@@ -31,9 +29,6 @@ const PALETTE = [
 
 // A tiny blur hash placeholder so images feel instant on load
 const BLUR_HASH = "LGFFaXYk^6#M@-5c,1J5@[or[Q6.";
-
-// Global in-memory cache of loaded/error states across the entire app
-const avatarLoadCache = new Map<string, Exclude<AvatarLoadState, "idle" | "loading">>();
 
 const resolveAvatarUri = (value?: string): string => {
   if (!value || typeof value !== "string") return "";
@@ -58,9 +53,7 @@ const resolveAvatarUri = (value?: string): string => {
   }
 
   return `${baseOrigin}/${cleanPath}`;
-};
-
-function AvatarBase({
+};function AvatarBase({
   name,
   uri,
   size = 44,
@@ -70,26 +63,11 @@ function AvatarBase({
 }: AvatarProps) {
   const theme = useTheme();
   const resolvedUri = useMemo(() => resolveAvatarUri(uri), [uri]);
+  const [hasError, setHasError] = useState(false);
 
-  // Synchronous state management to prevent async race conditions / stale state in FlatLists
-  const [state, setState] = useState(() => {
-    const cached = resolvedUri ? avatarLoadCache.get(resolvedUri) : undefined;
-    return {
-      uri: resolvedUri,
-      status: cached ?? (resolvedUri ? ("loading" as AvatarLoadState) : ("idle" as AvatarLoadState)),
-      errorCount: 0,
-    };
-  });
-
-  // Synchronous prop-change synchronization (React official pattern for derived state)
-  if (state.uri !== resolvedUri) {
-    const cached = resolvedUri ? avatarLoadCache.get(resolvedUri) : undefined;
-    setState({
-      uri: resolvedUri,
-      status: cached ?? (resolvedUri ? "loading" : "idle"),
-      errorCount: 0,
-    });
-  }
+  useEffect(() => {
+    setHasError(false);
+  }, [resolvedUri]);
 
   const initials = useMemo(() => {
     const words = (name || "M").split(" ").filter(Boolean);
@@ -100,35 +78,6 @@ function AvatarBase({
   }, [name]);
 
   const colorEntry = PALETTE[initials.charCodeAt(0) % PALETTE.length];
-
-  // Intelligent error retry logic with exponential backoff
-  const handleError = () => {
-    if (!resolvedUri) return;
-    if (state.errorCount < 2) {
-      setTimeout(() => {
-        setState((prev) =>
-          prev.uri === resolvedUri
-            ? { ...prev, errorCount: prev.errorCount + 1, status: "loading" }
-            : prev,
-        );
-      }, 1000 * (state.errorCount + 1));
-    } else {
-      avatarLoadCache.set(resolvedUri, "error");
-      setState((prev) => (prev.uri === resolvedUri ? { ...prev, status: "error" } : prev));
-    }
-  };
-
-  const isLoaded = state.status === "loaded";
-  const isLoading = state.status === "loading" || loading;
-  const isError = state.status === "error";
-  const isIdle = !resolvedUri || state.status === "idle";
-
-  // Fallback initials appear ONLY if no image exists OR image fails permanently
-  const showFallbackInitials = isIdle || isError;
-  // Loading placeholder appears while image is loading
-  const showLoadingPlaceholder = state.status === "loading" && !isLoaded;
-  // Image component mounts if URI exists and hasn't permanently failed
-  const showImage = Boolean(resolvedUri) && !isError;
 
   // Verified ring: 2px primary-colored border around the whole avatar
   const ringSize = size + (verified ? 4 : 0);
@@ -162,29 +111,20 @@ function AvatarBase({
           },
         ]}
       >
-        {/* 1. Fallback Initials: ALWAYS rendered underneath the Image when applicable */}
-        {showFallbackInitials || showLoadingPlaceholder ? (
-          <View style={[StyleSheet.absoluteFill, styles.centerContainer]}>
-            {showFallbackInitials ? (
-              <Text
-                style={[
-                  styles.initials,
-                  { fontSize: size * 0.38, color: colorEntry.text },
-                ]}
-              >
-                {initials}
-              </Text>
-            ) : null}
-            {showLoadingPlaceholder ? (
-              <View style={[StyleSheet.absoluteFill, styles.centerContainer, styles.loadingBg]}>
-                <ActivityIndicator size="small" color={colorEntry.text} />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+        {/* Base Layer: ALWAYS render initials so there is never a blank flash. */}
+        <View style={[StyleSheet.absoluteFill, styles.centerContainer]}>
+          <Text
+            style={[
+              styles.initials,
+              { fontSize: size * 0.38, color: colorEntry.text },
+            ]}
+          >
+            {initials}
+          </Text>
+        </View>
 
-        {/* 2. Expo Image: Rendered on top of the fallback initials */}
-        {showImage ? (
+        {/* Image Layer: Renders on top of initials if resolvedUri is present and hasn't errored. Fades in natively. */}
+        {resolvedUri && !hasError ? (
           <Image
             source={{ uri: resolvedUri }}
             style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
@@ -192,23 +132,20 @@ function AvatarBase({
             placeholder={BLUR_HASH}
             cachePolicy="memory-disk"
             recyclingKey={resolvedUri}
-            transition={avatarLoadCache.get(resolvedUri) === "loaded" ? 0 : 150}
-            onLoadStart={() => {
-              if (state.status !== "loading" && state.status !== "loaded") {
-                setState((prev) => (prev.uri === resolvedUri ? { ...prev, status: "loading" } : prev));
-              }
-            }}
-            onLoad={() => {
-              avatarLoadCache.set(resolvedUri, "loaded");
-              setState((prev) => (prev.uri === resolvedUri ? { ...prev, status: "loaded" } : prev));
-            }}
-            onError={handleError}
+            transition={150}
+            onError={() => setHasError(true)}
           />
         ) : null}
 
-        {/* 3. Explicit loading overlay (e.g. when uploading new avatar) */}
-        {loading && isLoaded ? (
-          <View style={[StyleSheet.absoluteFill, styles.centerContainer, styles.uploadingOverlay]}>
+        {/* Loading Overlay: For explicit uploading/action loading states */}
+        {loading ? (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.centerContainer,
+              styles.uploadingOverlay,
+            ]}
+          >
             <ActivityIndicator size="small" color="#FFFFFF" />
           </View>
         ) : null}
@@ -239,14 +176,16 @@ function AvatarBase({
   );
 }
 
-export const Avatar = memo(AvatarBase, (prev, next) => (
-  prev.name === next.name &&
-  prev.uri === next.uri &&
-  prev.size === next.size &&
-  prev.verified === next.verified &&
-  prev.online === next.online &&
-  prev.loading === next.loading
-));
+export const Avatar = memo(
+  AvatarBase,
+  (prev, next) =>
+    prev.name === next.name &&
+    prev.uri === next.uri &&
+    prev.size === next.size &&
+    prev.verified === next.verified &&
+    prev.online === next.online &&
+    prev.loading === next.loading,
+);
 
 const styles = StyleSheet.create({
   wrapper: {

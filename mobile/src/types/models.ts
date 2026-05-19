@@ -143,6 +143,18 @@ export interface Job {
   createdAt: string;
 }
 
+export interface ResolvedPeerIdentity {
+  id: string;
+  displayName: string;
+  username: string;
+  profileImage: string;
+  isOnline: boolean;
+  lastSeen?: string;
+  isVerified: boolean;
+  role: string;
+  specialization?: string;
+}
+
 export interface Conversation {
   _id: string;
   participants: User[];
@@ -157,6 +169,7 @@ export interface Conversation {
   unreadCount?: number;
   unreadCounts?: Record<string, number>;
   mutedBy?: string[];
+  peer?: ResolvedPeerIdentity;
 }
 
 export interface Message {

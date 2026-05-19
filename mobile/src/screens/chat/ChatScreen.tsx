@@ -48,6 +48,7 @@ import { getSocket } from "@/services/socket/socketClient";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
 import { hapticTap } from "@/utils/haptics";
+import { resolveConversationPeer } from "@/utils/identityResolver";
 import type { Message, User } from "@/types/models";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -80,10 +81,12 @@ export function ChatScreen() {
     conversations,
     messagesByConversation,
     paginationByConversation,
+    loadingHeadersByConversation,
     drafts,
     isHydrated,
     hydrateDrafts,
     setDraft,
+    getConversation,
     fetchMessages,
     loadOlderMessages,
     sendMessage,
@@ -100,34 +103,72 @@ export function ChatScreen() {
 
   const conversationId = route.params.conversationId;
   const messages = useMemo(
-    () => (messagesByConversation[conversationId] || []).slice().reverse(),
+    () =>
+      (messagesByConversation[conversationId] || [])
+        .filter((message): message is Message =>
+          Boolean(message && message._id && message.senderId),
+        )
+        .slice()
+        .reverse(),
     [conversationId, messagesByConversation],
   );
   const pagination = paginationByConversation[conversationId];
+  const isLoadingHeader = Boolean(loadingHeadersByConversation[conversationId]);
   const conversation = conversations.find(
     (item) => item._id === conversationId,
   );
   const isGroup = Boolean(conversation?.isGroup);
   const peer = useMemo(
     () =>
-      (conversation?.participants || []).find((item) => item._id !== user?._id),
-    [conversation?.participants, user?._id],
+      conversation?.peer ||
+      (conversation && !isGroup
+        ? resolveConversationPeer(conversation, user?._id)
+        : undefined),
+    [conversation, isGroup, user?._id],
   );
-  const title =
-    route.params.title ||
-    conversation?.title ||
-    (isGroup ? "Group Chat" : peer?.name || "Conversation");
-  
+
+  // Requirement 3: Safe loading lifecycle. True if header is actively fetching or conversation/peer data is not yet hydrated.
+  const isHeaderHydrating =
+    isLoadingHeader || !conversation || (!isGroup && !peer);
+
+  const title = conversation
+    ? isGroup
+      ? conversation.title || "Group Chat"
+      : peer?.displayName || "User unavailable"
+    : isHeaderHydrating
+      ? "Loading..."
+      : route.params.title || "User unavailable";
+
+  useEffect(() => {
+    if (
+      !conversation ||
+      (conversation.participants || []).length === 0 ||
+      (!isGroup && !peer?.profileImage)
+    ) {
+      void getConversation(conversationId).catch(() => {
+        // Keep the current thread usable even if header hydration fails.
+      });
+    }
+  }, [
+    conversation,
+    conversationId,
+    getConversation,
+    isGroup,
+    peer?.profileImage,
+  ]);
+
   const isOnline = !isGroup && Boolean(peer?.isOnline);
-  const statusText = isTyping
-    ? "typing..."
-    : isGroup
-      ? `${conversation?.participants?.length || 0} members`
-      : isOnline
-        ? "Online now"
-        : peer?.lastSeen
-          ? `Last seen ${dateLabel(peer.lastSeen)}`
-          : "Offline";
+  const statusText = isHeaderHydrating
+    ? "connecting..."
+    : isTyping
+      ? "typing..."
+      : isGroup
+        ? `${conversation?.participants?.length || 0} members`
+        : isOnline
+          ? "Online now"
+          : peer?.lastSeen
+            ? `Last seen ${dateLabel(peer.lastSeen)}`
+            : "Offline";
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -155,7 +196,7 @@ export function ChatScreen() {
 
     fetchMessages(conversationId);
     const socket = getSocket();
-    
+
     const handleConnect = () => {
       socket?.emit("joinConversation", { conversationId });
       socket?.emit("markConversationRead", { conversationId });
@@ -189,8 +230,18 @@ export function ChatScreen() {
       }
     };
 
-    const handleMessageReactionUpdated = (payload: { conversationId: string; messageId: string; reactions: Record<string, string[]> }) => {
-      useChatStore.getState().updateMessageReactions(payload.conversationId, payload.messageId, payload.reactions);
+    const handleMessageReactionUpdated = (payload: {
+      conversationId: string;
+      messageId: string;
+      reactions: Record<string, string[]>;
+    }) => {
+      useChatStore
+        .getState()
+        .updateMessageReactions(
+          payload.conversationId,
+          payload.messageId,
+          payload.reactions,
+        );
     };
 
     socket?.on("connect", handleConnect);
@@ -223,12 +274,12 @@ export function ChatScreen() {
   const handleSend = async () => {
     const textToSend = messageText;
     if (!textToSend.trim()) return;
-    
+
     // Optimistic UI - clear immediately
     setMessageText("");
     setDraft(conversationId, "");
     hapticTap();
-    
+
     try {
       setSending(true);
       await sendMessage(conversationId, textToSend);
@@ -281,10 +332,14 @@ export function ChatScreen() {
             showSender={showSender}
             isGrouped={isGrouped}
             onReactionToggle={(msgId, reaction) => {
-              useChatStore.getState().toggleMessageReaction(conversationId, msgId, reaction);
+              useChatStore
+                .getState()
+                .toggleMessageReaction(conversationId, msgId, reaction);
             }}
             onRetry={(tempId) => resendMessage(conversationId, tempId)}
-            onDeleteFailed={(tempId) => removeFailedMessage(conversationId, tempId)}
+            onDeleteFailed={(tempId) =>
+              removeFailedMessage(conversationId, tempId)
+            }
           />
         </Animated.View>
       );
@@ -340,31 +395,58 @@ export function ChatScreen() {
 
         <Pressable
           onPress={openGroupInfo}
-          disabled={!isGroup}
+          disabled={!isGroup || isHeaderHydrating}
           style={styles.headerIdentity}
         >
-          <Avatar
-            name={title}
-            uri={isGroup ? conversation?.image : peer?.profileImage}
-            size={38}
-            verified={!isGroup && Boolean(peer?.isVerified)}
-            online={false}
-          />
+          {isHeaderHydrating ? (
+            <>
+              <View
+                style={[
+                  styles.avatarSkeleton,
+                  { backgroundColor: theme.colors.borderLight },
+                ]}
+              />
+              <View style={styles.headerTextWrap}>
+                <View
+                  style={[
+                    styles.titleSkeleton,
+                    { backgroundColor: theme.colors.borderLight },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.statusSkeleton,
+                    { backgroundColor: theme.colors.borderLight },
+                  ]}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <Avatar
+                name={isGroup ? title : peer?.displayName || title}
+                uri={isGroup ? conversation?.image : peer?.profileImage}
+                size={38}
+                verified={!isGroup && Boolean(peer?.isVerified)}
+                online={!isGroup && Boolean(peer?.isOnline)}
+              />
 
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {title}
-            </Text>
-            <View style={styles.statusRow}>
-              {isTyping ? <TypingDots compact /> : null}
-              <Text
-                style={[styles.headerStatus, isTyping && styles.typingStatus]}
-                numberOfLines={1}
-              >
-                {statusText}
-              </Text>
-            </View>
-          </View>
+              <View style={styles.headerTextWrap}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                <View style={styles.statusRow}>
+                  {isTyping ? <TypingDots compact /> : null}
+                  <Text
+                    style={[styles.headerStatus, isTyping && styles.typingStatus]}
+                    numberOfLines={1}
+                  >
+                    {statusText}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </Pressable>
 
         <View style={styles.headerActions}>
@@ -686,6 +768,25 @@ const createStyles = (theme: ReturnType<typeof useTheme>) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
+    },
+    avatarSkeleton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      opacity: 0.6,
+    },
+    titleSkeleton: {
+      width: 110,
+      height: 15,
+      borderRadius: 8,
+      marginBottom: 5,
+      opacity: 0.6,
+    },
+    statusSkeleton: {
+      width: 75,
+      height: 11,
+      borderRadius: 6,
+      opacity: 0.6,
     },
     messagesContent: {
       flexGrow: 1,
