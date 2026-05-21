@@ -68,6 +68,7 @@ interface ChatState {
   removeConversation: (conversationId: string) => void;
   updateUserStatus: (payload: { userId: string; isOnline: boolean; lastSeen: string | null }) => void;
   markConversationMessagesRead: (conversationId: string, userId: string) => void;
+  deleteMessage: (conversationId: string, messageId: string) => void;
 }
 
 const sortConversations = (items: Conversation[]) =>
@@ -79,7 +80,7 @@ const mergeMessages = (existing: Message[], incoming: Message[]): Message[] => {
   const byId = new Map<string, Message>();
   [...incoming, ...existing].forEach((m) => byId.set(m._id, m));
   return Array.from(byId.values()).sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 };
 
@@ -211,7 +212,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({
         messagesByConversation: {
           ...state.messagesByConversation,
-          [conversationId]: response.data,
+          [conversationId]: response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
         },
         paginationByConversation: {
           ...state.paginationByConversation,
@@ -453,15 +454,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (msg._id !== messageId) return msg;
 
         const currentReactions = msg.reactions ? { ...msg.reactions } : {};
-        const users = [...(currentReactions[reaction] || [])];
         const currentUserId = useAuthStore.getState().user?._id;
 
         if (!currentUserId) return msg;
 
+        // Remove user from all other reactions
+        Object.keys(currentReactions).forEach(key => {
+          if (key !== reaction) {
+            currentReactions[key] = currentReactions[key].filter(id => id !== currentUserId);
+            if (currentReactions[key].length === 0) {
+              delete currentReactions[key];
+            }
+          }
+        });
+
+        const users = [...(currentReactions[reaction] || [])];
+
         const userIndex = users.indexOf(currentUserId);
         if (userIndex > -1) {
+          // If already reacted with this emoji, toggle it off
           users.splice(userIndex, 1);
         } else {
+          // Otherwise add the new reaction
           users.push(currentUserId);
         }
 
@@ -499,6 +513,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       };
     });
+  },
+
+  deleteMessage: (conversationId, messageId) => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    set((state) => {
+      const messages = state.messagesByConversation[conversationId] || [];
+      return {
+        messagesByConversation: {
+          ...state.messagesByConversation,
+          [conversationId]: messages.filter(m => m._id !== messageId),
+        }
+      };
+    });
+
+    socket.emit("deleteMessage", { conversationId, messageId });
   },
 
   upsertConversation: (conversation) => {

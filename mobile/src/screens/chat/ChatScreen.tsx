@@ -16,7 +16,12 @@ import {
   Text,
   TextInput,
   View,
+  Share,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as DocumentPicker from "expo-document-picker";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -30,6 +35,7 @@ import {
   Smile,
   Users,
   Video,
+  X,
 } from "lucide-react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
@@ -42,7 +48,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "styled-components/native";
 
+import BottomSheet from "@gorhom/bottom-sheet";
+
 import { ChatBubble } from "@/components/chat/ChatBubble";
+import { MessageContextMenu } from "@/components/chat/MessageContextMenu";
+import { AttachmentBottomSheet } from "@/components/chat/AttachmentBottomSheet";
+import { PollCreatorModal } from "@/components/chat/PollCreatorModal";
+import { ContactPickerModal } from "@/components/chat/ContactPickerModal";
 import { Avatar } from "@/components/common/Avatar";
 import { getSocket } from "@/services/socket/socketClient";
 import { useAuthStore } from "@/store/authStore";
@@ -97,11 +109,19 @@ export function ChatScreen() {
   const [composerFocused, setComposerFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const attachmentSheetRef = useRef<BottomSheet>(null);
+
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+
+  const [isPollModalVisible, setPollModalVisible] = useState(false);
+  const [isContactModalVisible, setContactModalVisible] = useState(false);
 
   const conversationId = route.params.conversationId;
   const messages = useMemo(
-    () => (messagesByConversation[conversationId] || []).slice().reverse(),
-    [conversationId, messagesByConversation],
+    () => (messagesByConversation[conversationId] || []),
+    [messagesByConversation, conversationId]
   );
   const pagination = paginationByConversation[conversationId];
   const conversation = conversations.find(
@@ -221,12 +241,21 @@ export function ChatScreen() {
   };
 
   const handleSend = async () => {
-    const textToSend = messageText;
+    let textToSend = messageText;
     if (!textToSend.trim()) return;
     
+    if (replyingToMessage) {
+      const quotedText = replyingToMessage.text?.length > 50 
+        ? replyingToMessage.text.substring(0, 50) + "..." 
+        : replyingToMessage.text;
+      const peerName = replyingToMessage.senderId.name.split(" ")[0];
+      textToSend = `> Replying to ${peerName}: "${quotedText}"\n\n${textToSend}`;
+    }
+
     // Optimistic UI - clear immediately
     setMessageText("");
     setDraft(conversationId, "");
+    setReplyingToMessage(null);
     hapticTap();
     
     try {
@@ -235,6 +264,88 @@ export function ChatScreen() {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleOptionsOpen = useCallback((message: Message) => {
+    setSelectedMessage(message);
+    bottomSheetRef.current?.snapToIndex(0);
+  }, []);
+
+  const handleCopy = useCallback(async (message: Message) => {
+    if (message.text) {
+      await Clipboard.setStringAsync(message.text);
+    }
+  }, []);
+
+  const handleForward = useCallback(async (message: Message) => {
+    if (message.text) {
+      await Share.share({
+        message: message.text,
+      });
+    }
+  }, []);
+
+  const handleDelete = useCallback((message: Message) => {
+    useChatStore.getState().deleteMessage(conversationId, message._id);
+  }, [conversationId]);
+
+  const handleReply = useCallback((message: Message) => {
+    setReplyingToMessage(message);
+    inputRef.current?.focus();
+  }, []);
+
+  const handleAttachmentSelect = async (option: string) => {
+    try {
+      if (option === "gallery") {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+          await sendMessage(conversationId, "", result.assets[0].uri);
+        }
+      } else if (option === "document") {
+        const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+        if (!result.canceled && result.assets[0]) {
+          // Sending the document URI as mediaUrl (you might need a backend update to handle files properly, but this simulates it)
+          await sendMessage(conversationId, `📄 Shared Document: ${result.assets[0].name}`, result.assets[0].uri);
+        }
+      } else if (option === "location") {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          useToastStore.getState().showToast("Location permission denied");
+          return;
+        }
+        
+        // Show loading state or toast here if desired
+        const location = await Location.getCurrentPositionAsync({});
+        const mapsLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+        await sendMessage(conversationId, `📍 Shared Location\n${mapsLink}`);
+      } else if (option === "contact") {
+        setContactModalVisible(true);
+      } else if (option === "poll") {
+        setPollModalVisible(true);
+      } else {
+        useToastStore.getState().showToast(`${option} not implemented yet`);
+      }
+    } catch (e) {
+      console.log("Attachment error:", e);
+    }
+  };
+
+  const handleCreatePoll = async (question: string, options: string[]) => {
+    const pollData = {
+      isPoll: true,
+      question,
+      options
+    };
+    await sendMessage(conversationId, JSON.stringify(pollData));
+  };
+
+  const handleSelectContact = async (name: string, phone: string) => {
+    setContactModalVisible(false);
+    await sendMessage(conversationId, `👤 Contact Shared\nName: ${name}\nPhone: ${phone}`);
   };
 
   const handleLoadOlder = useCallback(() => {
@@ -280,6 +391,7 @@ export function ChatScreen() {
             isMine={isMine}
             showSender={showSender}
             isGrouped={isGrouped}
+            onOptionsOpen={handleOptionsOpen}
             onReactionToggle={(msgId, reaction) => {
               useChatStore.getState().toggleMessageReaction(conversationId, msgId, reaction);
             }}
@@ -411,6 +523,8 @@ export function ChatScreen() {
         removeClippedSubviews={Platform.OS === "android"}
         onEndReached={handleLoadOlder}
         onEndReachedThreshold={0.25}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
         ListFooterComponent={listFooter}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -461,6 +575,7 @@ export function ChatScreen() {
           ]}
         >
           <Pressable
+            onPress={() => attachmentSheetRef.current?.snapToIndex(0)}
             style={({ pressed }) => [
               styles.composerIconButton,
               pressed && styles.composerIconPressed,
@@ -473,13 +588,29 @@ export function ChatScreen() {
             />
           </Pressable>
 
-          <View style={styles.inputWrap}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.emojiButton,
-                pressed && styles.composerIconPressed,
-              ]}
-            >
+          <View style={{ flex: 1 }}>
+            {replyingToMessage && (
+              <View style={styles.replyPreview}>
+                <View style={styles.replyBar} />
+                <View style={styles.replyContent}>
+                  <Text style={styles.replyName}>{replyingToMessage.senderId.name}</Text>
+                  <Text style={styles.replyText} numberOfLines={1}>
+                    {replyingToMessage.text || (replyingToMessage.mediaUrl ? "Photo" : "")}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setReplyingToMessage(null)} style={styles.replyClose}>
+                  <X size={16} color={theme.colors.iconMuted} />
+                </Pressable>
+              </View>
+            )}
+            <View style={styles.inputWrap}>
+              <Pressable
+                onPress={() => inputRef.current?.focus()}
+                style={({ pressed }) => [
+                  styles.emojiButton,
+                  pressed && styles.composerIconPressed,
+                ]}
+              >
               <Smile
                 size={18}
                 color={theme.colors.iconMuted}
@@ -501,6 +632,7 @@ export function ChatScreen() {
               onFocus={() => setComposerFocused(true)}
               onBlur={() => setComposerFocused(false)}
             />
+          </View>
           </View>
 
           <Pressable
@@ -544,6 +676,38 @@ export function ChatScreen() {
           </Pressable>
         </BlurView>
       </View>
+      
+      <MessageContextMenu
+        message={selectedMessage}
+        bottomSheetRef={bottomSheetRef}
+        currentUserId={user?._id}
+        onClose={() => setSelectedMessage(null)}
+        onReact={(messageId, reaction) => {
+          useChatStore.getState().toggleMessageReaction(conversationId, messageId, reaction);
+        }}
+        onReply={handleReply}
+        onCopy={handleCopy}
+        onForward={handleForward}
+        onDelete={handleDelete}
+      />
+      
+      <AttachmentBottomSheet
+        bottomSheetRef={attachmentSheetRef}
+        onClose={() => {}}
+        onSelectOption={handleAttachmentSelect}
+      />
+
+      <PollCreatorModal
+        visible={isPollModalVisible}
+        onClose={() => setPollModalVisible(false)}
+        onCreate={handleCreatePoll}
+      />
+
+      <ContactPickerModal
+        visible={isContactModalVisible}
+        onClose={() => setContactModalVisible(false)}
+        onSelect={handleSelectContact}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -826,6 +990,40 @@ const createStyles = (theme: ReturnType<typeof useTheme>) =>
       backgroundColor: theme.colors.composerInput,
       borderWidth: 1,
       borderColor: theme.colors.borderLight,
+    },
+    replyPreview: {
+      flexDirection: "row",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderRadius: 12,
+      marginBottom: 6,
+      overflow: "hidden",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+    },
+    replyBar: {
+      width: 4,
+      alignSelf: "stretch",
+      backgroundColor: theme.colors.primary,
+    },
+    replyContent: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+    },
+    replyName: {
+      fontFamily: "Manrope_700Bold",
+      fontSize: 12,
+      color: theme.colors.primary,
+      marginBottom: 2,
+    },
+    replyText: {
+      fontFamily: "Manrope_500Medium",
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    replyClose: {
+      padding: 8,
     },
     emojiButton: {
       width: 28,

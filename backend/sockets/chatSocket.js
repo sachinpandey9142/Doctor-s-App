@@ -420,6 +420,19 @@ const initializeSocket = (httpServer) => {
         if (!message) throw new Error("Message not found");
 
         const currentReactions = message.reactions || new Map();
+        
+        // Remove user from all other reactions
+        for (const [key, usersArray] of currentReactions.entries()) {
+          if (key !== reaction) {
+            const filtered = usersArray.filter(id => String(id) !== String(socket.userId));
+            if (filtered.length === 0) {
+              currentReactions.delete(key);
+            } else {
+              currentReactions.set(key, filtered);
+            }
+          }
+        }
+
         const users = currentReactions.get(reaction) || [];
         const userIndex = users.findIndex(id => String(id) === String(socket.userId));
 

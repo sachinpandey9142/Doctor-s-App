@@ -16,17 +16,29 @@ interface ChatBubbleProps {
   isMine: boolean;
   showSender?: boolean;
   isGrouped?: boolean;
-  isGrouped?: boolean;
+  onOptionsOpen?: (message: Message) => void;
   onReactionToggle?: (messageId: string, reaction: string) => void;
   onRetry?: (tempId: string) => void;
   onDeleteFailed?: (tempId: string) => void;
 }
 
-function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false, onReactionToggle, onRetry, onDeleteFailed }: ChatBubbleProps) {
+function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false, onOptionsOpen, onReactionToggle, onRetry, onDeleteFailed }: ChatBubbleProps) {
   const theme = useTheme();
   const currentUserId = useAuthStore((s) => s.user?._id);
   const senderName = message.senderId?.name ?? "Someone";
   const timeStr = formatRelativeTime(message.createdAt);
+
+  let pollData = null;
+  try {
+    if (message.text && message.text.includes('"isPoll":true')) {
+      const parsed = JSON.parse(message.text);
+      if (parsed.isPoll && parsed.question && Array.isArray(parsed.options)) {
+        pollData = parsed;
+      }
+    }
+  } catch (e) {
+    // Not a poll or invalid JSON
+  }
   
   const reactions = message.reactions || {};
   const hasReactions = Object.keys(reactions).length > 0;
@@ -36,14 +48,16 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
 
   const handleLongPress = () => {
     if (message.status === "failed") {
-      // Don't allow reactions on failed messages, maybe delete?
       if (onDeleteFailed && message.tempId) {
         hapticTap();
         onDeleteFailed(message.tempId);
       }
       return;
     }
-    if (onReactionToggle) {
+    if (onOptionsOpen) {
+      hapticTap();
+      onOptionsOpen(message);
+    } else if (onReactionToggle) {
       hapticTap();
       onReactionToggle(message._id, "heart");
     }
@@ -65,7 +79,7 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
               {senderName}
             </Text>
           ) : null}
-          <Pressable style={({ pressed }) => [styles.pressWrap, pressed && styles.pressedBubble]}>
+          <Pressable style={({ pressed }) => [styles.pressWrap, pressed && styles.pressedBubble]} onLongPress={handleLongPress} onPress={handlePress}>
             <View
               style={[
                 styles.bubble,
@@ -80,7 +94,32 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
               ]}
             >
               {message.mediaUrl ? <Image source={{ uri: message.mediaUrl }} style={styles.mediaImage} contentFit="cover" transition={250} /> : null}
-              {message.text ? <Text style={[styles.receivedText, { color: theme.colors.messageIncomingText }]}>{message.text}</Text> : null}
+              {pollData ? (
+                <View style={styles.pollContainer}>
+                  <Text style={[styles.pollQuestion, { color: theme.colors.textPrimary }]}>{pollData.question}</Text>
+                  {pollData.options.map((opt: string, idx: number) => {
+                    const reactionKey = `poll_opt_${idx}`;
+                    const votes = (reactions[reactionKey] || []).length;
+                    const totalVotes = pollData.options.reduce((sum: number, _: any, i: number) => sum + ((reactions[`poll_opt_${i}`] || []).length), 0);
+                    const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+                    const iVoted = (reactions[reactionKey] || []).includes(currentUserId || "");
+                    
+                    return (
+                      <Pressable 
+                        key={idx} 
+                        style={[styles.pollOption, iVoted && { borderColor: theme.colors.primary, borderWidth: 1 }]}
+                        onPress={() => onReactionToggle && onReactionToggle(message._id, reactionKey)}
+                      >
+                        <View style={[styles.pollProgress, { width: `${percentage}%`, backgroundColor: theme.colors.primaryLight }]} />
+                        <Text style={[styles.pollOptionText, { color: theme.colors.textPrimary }]}>{opt}</Text>
+                        {votes > 0 && <Text style={[styles.pollVotesText, { color: theme.colors.textSecondary }]}>{votes}</Text>}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : message.text ? (
+                <Text style={[styles.receivedText, { color: theme.colors.messageIncomingText }]}>{message.text}</Text>
+              ) : null}
               <Text style={[styles.receivedTimestamp, { color: theme.colors.messageIncomingMeta }]}>{timeStr}</Text>
             </View>
           </Pressable>
@@ -88,6 +127,8 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
             <View style={styles.reactionsWrap}>
               {Object.entries(reactions).map(([key, users]) => {
                 if (!users.length) return null;
+                // Don't render poll reactions as standard reaction pills
+                if (key.startsWith("poll_opt_")) return null;
                 const iReacted = users.includes(currentUserId || "");
                 return (
                   <View key={key} style={[styles.reactionPill, { backgroundColor: iReacted ? theme.colors.primaryLight : theme.colors.reactionBackground, borderColor: theme.colors.reactionBorder }]}>
@@ -109,7 +150,32 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
         <Pressable style={({ pressed }) => [styles.pressWrap, pressed && styles.pressedBubble]} onLongPress={handleLongPress} onPress={handlePress}>
           <LinearGradient colors={theme.gradients.sentBubble} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.sentBubble, { shadowColor: theme.shadow.floating.shadowColor, shadowOpacity: theme.isDark ? 0.18 : 0.15 }, isGrouped && styles.sentGrouped, message.status === "failed" && styles.failedBubble]}>
             {message.mediaUrl ? <Image source={{ uri: message.mediaUrl }} style={styles.mediaImage} contentFit="cover" transition={250} /> : null}
-            {message.text ? <Text style={[styles.sentText, { color: theme.colors.messageOutgoingText }]}>{message.text}</Text> : null}
+            {pollData ? (
+                <View style={styles.pollContainer}>
+                  <Text style={[styles.pollQuestion, { color: theme.colors.messageOutgoingText }]}>{pollData.question}</Text>
+                  {pollData.options.map((opt: string, idx: number) => {
+                    const reactionKey = `poll_opt_${idx}`;
+                    const votes = (reactions[reactionKey] || []).length;
+                    const totalVotes = pollData.options.reduce((sum: number, _: any, i: number) => sum + ((reactions[`poll_opt_${i}`] || []).length), 0);
+                    const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+                    const iVoted = (reactions[reactionKey] || []).includes(currentUserId || "");
+                    
+                    return (
+                      <Pressable 
+                        key={idx} 
+                        style={[styles.pollOption, { backgroundColor: "rgba(255,255,255,0.15)" }, iVoted && { borderColor: "#FFF", borderWidth: 1 }]}
+                        onPress={() => onReactionToggle && onReactionToggle(message._id, reactionKey)}
+                      >
+                        <View style={[styles.pollProgress, { width: `${percentage}%`, backgroundColor: "rgba(255,255,255,0.2)" }]} />
+                        <Text style={[styles.pollOptionText, { color: theme.colors.messageOutgoingText }]}>{opt}</Text>
+                        {votes > 0 && <Text style={[styles.pollVotesText, { color: "rgba(255,255,255,0.8)" }]}>{votes}</Text>}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : message.text ? (
+                <Text style={[styles.sentText, { color: theme.colors.messageOutgoingText }]}>{message.text}</Text>
+              ) : null}
             <View style={styles.sentMeta}>
               <Text style={[styles.sentTimestamp, { color: theme.colors.messageOutgoingMeta }]}>{timeStr}</Text>
               {message.status === "pending" ? (
@@ -126,6 +192,9 @@ function ChatBubbleBase({ message, isMine, showSender = false, isGrouped = false
           <View style={[styles.reactionsWrap, styles.sentReactionsWrap]}>
             {Object.entries(reactions).map(([key, users]) => {
               if (!users.length) return null;
+              // Don't render poll reactions as standard reaction pills
+              if (key.startsWith("poll_opt_")) return null;
+              
               const iReacted = users.includes(currentUserId || "");
               return (
                 <View key={key} style={[styles.reactionPill, { backgroundColor: iReacted ? theme.colors.primaryLight : theme.colors.reactionBackground, borderColor: theme.colors.reactionBorder }]}>
@@ -272,5 +341,45 @@ const styles = StyleSheet.create({
   reactionText: {
     fontFamily: "Manrope_800ExtraBold",
     fontSize: 10
+  },
+  pollContainer: {
+    minWidth: 220,
+    maxWidth: 260,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  pollQuestion: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  pollOption: {
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderRadius: 8,
+    marginBottom: 6,
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    position: "relative",
+  },
+  pollProgress: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 8,
+  },
+  pollOptionText: {
+    fontFamily: "Manrope_600SemiBold",
+    fontSize: 14,
+    zIndex: 1,
+  },
+  pollVotesText: {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 12,
+    zIndex: 1,
   }
 });
