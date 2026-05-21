@@ -17,6 +17,11 @@ const adminRoutes = require("./routes/adminRoutes");
 const reputationRoutes = require("./routes/reputationRoutes");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
 
+const allowedOrigins = String(process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Configure Cloudinary from environment variables.
 // Values are optional at this stage — the upload endpoint will fail gracefully
 // with a clear error if credentials are missing when first used.
@@ -31,7 +36,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: true,
+    origin: allowedOrigins.length ? allowedOrigins : false,
     credentials: true,
   }),
 );
@@ -41,7 +46,7 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
 const path = require("path");
 
-// Serve locally-saved uploads as a static fallback (future use / dev fallback)
+// Serve locally-saved uploads only for local fallback scenarios.
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/health", (_req, res) => {
