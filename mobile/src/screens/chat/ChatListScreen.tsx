@@ -35,8 +35,9 @@ import { Avatar } from "@/components/common/Avatar";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
 import { formatRelativeTime } from "@/utils/date";
+import { resolveConversationPeer } from "@/utils/identityResolver";
 import type { RootStackParamList } from "@/navigation/types";
-import type { Conversation, User } from "@/types/models";
+import type { Conversation, ResolvedPeerIdentity, User } from "@/types/models";
 
 const CHAT_ROW_HEIGHT = 80;
 
@@ -47,7 +48,12 @@ export function ChatListScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAuthStore((state) => state.user);
-  const { conversations, fetchConversations } = useChatStore((state) => state);
+  const {
+    conversations,
+    loadingConversations,
+    loadingHeadersByConversation,
+    fetchConversations,
+  } = useChatStore((state) => state);
 
   const [searchText, setSearchText] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -59,10 +65,11 @@ export function ChatListScreen() {
   const conversationsWithPeer = useMemo(
     () =>
       conversations.map((conv) => {
-        const peer = (conv.participants || []).find(
-          (item) => item._id !== user?._id,
-        ) as User | undefined;
-        return { ...conv, peer };
+        let peer = conv.peer;
+        if (!conv.isGroup && (!peer || String(peer.id) === String(user?._id))) {
+          peer = resolveConversationPeer(conv, user?._id);
+        }
+        return { ...conv, peer: conv.isGroup ? undefined : peer };
       }),
     [conversations, user?._id],
   );
@@ -73,7 +80,7 @@ export function ChatListScreen() {
     return conversationsWithPeer.filter((c) => {
       const name = c.isGroup
         ? c.title || "Case Discussion"
-        : c.peer?.name || "";
+        : c.peer?.displayName || "";
       const lastMessage = c.lastMessage || "";
       return `${name} ${lastMessage}`.toLowerCase().includes(q);
     });
@@ -85,12 +92,12 @@ export function ChatListScreen() {
   );
 
   const openConversation = useCallback(
-    (conv: Conversation & { peer?: User }) => {
+    (conv: Conversation & { peer?: ResolvedPeerIdentity }) => {
       navigation.navigate("ChatScreen", {
         conversationId: conv._id,
         title: conv.isGroup
           ? conv.title || "Case Discussion"
-          : conv.peer?.name || "Conversation",
+          : conv.peer?.displayName || "Conversation",
       });
     },
     [navigation],
@@ -101,7 +108,7 @@ export function ChatListScreen() {
       item,
       index,
     }: {
-      item: Conversation & { peer?: User };
+      item: Conversation & { peer?: ResolvedPeerIdentity };
       index: number;
     }) => {
       const unread = item.unreadCount || 0;
@@ -111,9 +118,16 @@ export function ChatListScreen() {
       const isPinned = item._id.charCodeAt(0) % 5 === 0;
       const isMuted = item._id.charCodeAt(0) % 6 === 0;
       const isRead = item._id.charCodeAt(0) % 2 === 0;
+
+      // Requirement 2: Remove fallback rendering during loading. True if conversations or specific headers are actively fetching.
+      const isHydrating =
+        loadingConversations || Boolean(loadingHeadersByConversation[item._id]);
+
+      // Requirement 5: Add proper error states. If peer truly missing after hydration, show "User unavailable".
       const name = isGroup
-        ? item.title || "Case Discussion"
-        : item.peer?.name || "Medical Professional";
+        ? item.title || "Group Chat"
+        : item.peer?.displayName || "User unavailable";
+
       const preview = isTyping
         ? "typing..."
         : item.lastMessage || "Tap to start the conversation";
@@ -129,6 +143,7 @@ export function ChatListScreen() {
         >
           <Pressable
             onPress={() => openConversation(item)}
+            disabled={isHydrating}
             android_ripple={{
               color: theme.colors.overlaySoft,
               borderless: false,
@@ -139,93 +154,122 @@ export function ChatListScreen() {
               pressed && styles.chatRowPressed,
             ]}
           >
-            <View style={styles.avatarShell}>
-              <Avatar
-                name={name}
-                uri={avatarUri}
-                size={52}
-                verified={!isGroup && Boolean(item.peer?.isVerified)}
-                online={false}
-              />
-            </View>
-
-            <View style={styles.chatContent}>
-              <View style={styles.chatTopLine}>
-                <View style={styles.nameCluster}>
-                  <Text
+            {isHydrating ? (
+              <View style={styles.skeletonContainer}>
+                <View
+                  style={[
+                    styles.avatarSkeleton,
+                    { backgroundColor: theme.colors.borderLight },
+                  ]}
+                />
+                <View style={styles.skeletonTextWrap}>
+                  <View
                     style={[
-                      styles.chatName,
-                      unread > 0 && styles.chatNameUnread,
+                      styles.nameSkeleton,
+                      { backgroundColor: theme.colors.borderLight },
                     ]}
-                    numberOfLines={1}
-                  >
-                    {name}
-                  </Text>
-                  {!isGroup && item.peer?.isVerified ? (
-                    <ShieldCheck
-                      size={13}
-                      color={theme.colors.primary}
-                      strokeWidth={2.4}
-                    />
-                  ) : null}
+                  />
+                  <View
+                    style={[
+                      styles.previewSkeleton,
+                      { backgroundColor: theme.colors.borderLight },
+                    ]}
+                  />
                 </View>
-                <Text
-                  style={[styles.timeText, unread > 0 && styles.timeUnread]}
-                >
-                  {formatRelativeTime(item.updatedAt)}
-                </Text>
               </View>
-
-              <View style={styles.chatBottomLine}>
-                <View style={styles.previewWrap}>
-                  {unread === 0 && !isTyping ? (
-                    <CheckCheck
-                      size={14}
-                      color={
-                        isRead ? theme.colors.primary : theme.colors.iconMuted
-                      }
-                      strokeWidth={2.2}
-                    />
-                  ) : null}
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.previewText,
-                      unread > 0 && styles.previewUnread,
-                      isTyping && styles.typingText,
-                    ]}
-                  >
-                    {isGroup && !isTyping && participantCount > 2
-                      ? `${participantCount} members  ·  ${preview}`
-                      : preview}
-                  </Text>
+            ) : (
+              <>
+                <View style={styles.avatarShell}>
+                  <Avatar
+                    name={name}
+                    uri={avatarUri}
+                    size={52}
+                    verified={!isGroup && Boolean(item.peer?.isVerified)}
+                    online={!isGroup && Boolean(item.peer?.isOnline)}
+                  />
                 </View>
 
-                <View style={styles.stateCluster}>
-                  {isPinned ? (
-                    <Pin
-                      size={13}
-                      color={theme.colors.iconMuted}
-                      strokeWidth={2.1}
-                    />
-                  ) : null}
-                  {isMuted ? (
-                    <BellOff
-                      size={13}
-                      color={theme.colors.iconMuted}
-                      strokeWidth={2.1}
-                    />
-                  ) : null}
-                  {unread > 0 ? (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadBadgeText}>
-                        {unread > 99 ? "99+" : unread}
+                <View style={styles.chatContent}>
+                  <View style={styles.chatTopLine}>
+                    <View style={styles.nameCluster}>
+                      <Text
+                        style={[
+                          styles.chatName,
+                          unread > 0 && styles.chatNameUnread,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {name}
+                      </Text>
+                      {!isGroup && item.peer?.isVerified ? (
+                        <ShieldCheck
+                          size={13}
+                          color={theme.colors.primary}
+                          strokeWidth={2.4}
+                        />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={[styles.timeText, unread > 0 && styles.timeUnread]}
+                    >
+                      {formatRelativeTime(item.updatedAt)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.chatBottomLine}>
+                    <View style={styles.previewWrap}>
+                      {unread === 0 && !isTyping ? (
+                        <CheckCheck
+                          size={14}
+                          color={
+                            isRead
+                              ? theme.colors.primary
+                              : theme.colors.iconMuted
+                          }
+                          strokeWidth={2.2}
+                        />
+                      ) : null}
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.previewText,
+                          unread > 0 && styles.previewUnread,
+                          isTyping && styles.typingText,
+                        ]}
+                      >
+                        {isGroup && !isTyping && participantCount > 2
+                          ? `${participantCount} members  ·  ${preview}`
+                          : preview}
                       </Text>
                     </View>
-                  ) : null}
+
+                    <View style={styles.stateCluster}>
+                      {isPinned ? (
+                        <Pin
+                          size={13}
+                          color={theme.colors.iconMuted}
+                          strokeWidth={2.1}
+                        />
+                      ) : null}
+                      {isMuted ? (
+                        <BellOff
+                          size={13}
+                          color={theme.colors.iconMuted}
+                          strokeWidth={2.1}
+                        />
+                      ) : null}
+                      {unread > 0 ? (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadBadgeText}>
+                            {unread > 99 ? "99+" : unread}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </View>
+              </>
+            )}
           </Pressable>
         </Animated.View>
       );
@@ -234,7 +278,13 @@ export function ChatListScreen() {
   );
 
   const getItemLayout = useCallback(
-    (_: ArrayLike<Conversation & { peer?: User }> | null | undefined, index: number) => ({
+    (
+      _:
+        | ArrayLike<Conversation & { peer?: ResolvedPeerIdentity }>
+        | null
+        | undefined,
+      index: number,
+    ) => ({
       length: CHAT_ROW_HEIGHT,
       offset: CHAT_ROW_HEIGHT * index,
       index,
@@ -272,11 +322,28 @@ export function ChatListScreen() {
                 styles.headerIconButton,
                 pressed && styles.iconButtonPressed,
               ]}
+              accessibilityLabel="Create Group"
             >
               <UsersRound
                 size={20}
                 color={theme.colors.icon}
                 strokeWidth={2.3}
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={() => navigation.navigate("NewChatScreen")}
+              style={({ pressed }) => [
+                styles.headerIconButton,
+                styles.headerPrimaryButton,
+                pressed && styles.iconButtonPressed,
+              ]}
+              accessibilityLabel="New Chat"
+            >
+              <Pencil
+                size={20}
+                color={theme.colors.primary}
+                strokeWidth={2.5}
               />
             </Pressable>
           </View>
@@ -447,6 +514,10 @@ const createStyles = (theme: ReturnType<typeof useTheme>) =>
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
+    headerPrimaryButton: {
+      backgroundColor: theme.colors.primaryLight,
+      borderColor: theme.colors.primaryMid,
+    },
     iconButtonPressed: {
       transform: [{ scale: 0.96 }],
       backgroundColor: theme.colors.primaryLight,
@@ -520,6 +591,35 @@ const createStyles = (theme: ReturnType<typeof useTheme>) =>
     chatRowPressed: {
       transform: [{ scale: 0.988 }],
       backgroundColor: theme.colors.surfaceMuted,
+    },
+    skeletonContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 11,
+    },
+    avatarSkeleton: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      opacity: 0.6,
+    },
+    skeletonTextWrap: {
+      flex: 1,
+      justifyContent: "center",
+      gap: 8,
+    },
+    nameSkeleton: {
+      width: 140,
+      height: 16,
+      borderRadius: 8,
+      opacity: 0.6,
+    },
+    previewSkeleton: {
+      width: "80%",
+      height: 14,
+      borderRadius: 7,
+      opacity: 0.6,
     },
     avatarShell: {
       width: 52,

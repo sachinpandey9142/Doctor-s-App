@@ -45,6 +45,7 @@ export type RootStackParamList = {
     conversationId: string;
     title?: string;
   };
+  NewChatScreen: undefined;
   CreateGroupScreen:
     | {
         groupId?: string;

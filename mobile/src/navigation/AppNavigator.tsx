@@ -43,6 +43,7 @@ import { MemoryCollectionScreen } from "@/screens/memories/MemoryCollectionScree
 import { JobsScreen } from "@/screens/jobs/JobsScreen";
 import { ChatListScreen } from "@/screens/chat/ChatListScreen";
 import { ChatScreen } from "@/screens/chat/ChatScreen";
+import { NewChatScreen } from "@/screens/chat/NewChatScreen";
 import { CreateGroupScreen } from "@/screens/chat/CreateGroupScreen";
 import { GroupMembersScreen } from "@/screens/chat/GroupMembersScreen";
 import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
@@ -285,7 +286,7 @@ function MainStackNavigator() {
       <RootStack.Screen
         name="CreatePost"
         component={CreatePostScreen}
-        options={{ title: "Create Post" }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="AddStory"
@@ -326,6 +327,11 @@ function MainStackNavigator() {
         name="ChatScreen"
         component={ChatScreen}
         options={{ title: "Conversation" }}
+      />
+      <RootStack.Screen
+        name="NewChatScreen"
+        component={NewChatScreen}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="CreateGroupScreen"

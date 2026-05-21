@@ -7,7 +7,7 @@ const User = require("../models/User");
 const { createNotification } = require("../services/notificationService");
 
 const conversationSelect =
-  "name profileImage role isVerified specialization hospital experience reputationScore followers following createdAt";
+  "name profileImage role isVerified specialization hospital experience reputationScore followers following createdAt isOnline lastSeen";
 
 const conversationParticipantIds = (conversation) =>
   (conversation?.participants || []).map((participant) =>
