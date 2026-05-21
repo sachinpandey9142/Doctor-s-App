@@ -1,18 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const backendPort = process.env.BACKEND_PORT || "8080";
+const backendUrl =
+  process.env.VITE_API_URL || "https://curo-backend-fwaq.onrender.com";
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    "import.meta.env.VITE_BACKEND_PORT": JSON.stringify(backendPort),
-  },
   server: {
     port: 5173,
     proxy: {
       "/api": {
-        target: `http://localhost:${backendPort}`,
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
       },

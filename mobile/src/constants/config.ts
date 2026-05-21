@@ -1,23 +1,7 @@
-import Constants from "expo-constants";
-import { Platform } from "react-native";
-
-const defaultBackendPort = "8080";
+const productionBackendUrl = "https://curo-backend-fwaq.onrender.com";
 
 const uniq = (values: string[]) => Array.from(new Set(values));
-
-const resolveDevHost = () => {
-  // Extract dev server IP if running in Expo Go or Dev Client
-  const debuggerHost = Constants.expoConfig?.hostUri;
-  const hostName = debuggerHost?.split(":")[0];
-
-  if (hostName && !/^127\.0\.0\.1$|^localhost$/i.test(hostName)) {
-    return hostName;
-  }
-
-  // Fallbacks: 10.0.2.2 for Android emulators, localhost for iOS simulator
-  return Platform.OS === "android" ? "10.0.2.2" : "localhost";
-};
-const defaultHost = `http://${resolveDevHost()}:${defaultBackendPort}`;
+const defaultHost = productionBackendUrl;
 
 const normalizeUrl = (value: string) => {
   const trimmed = value.trim().replace(/\/+$/, "");
@@ -40,9 +24,7 @@ const buildApiBaseCandidates = () => {
     return [normalizeApiBaseUrl(envValue)];
   }
 
-  const candidates = [
-    normalizeApiBaseUrl(`http://${resolveDevHost()}:${defaultBackendPort}`),
-  ];
+  const candidates = [normalizeApiBaseUrl(defaultHost)];
 
   return uniq(candidates);
 };

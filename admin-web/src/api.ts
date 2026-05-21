@@ -2,12 +2,10 @@ import axios from "axios";
 import { useAdminStore } from "./store/adminStore";
 
 const viteEnv = import.meta.env as ImportMetaEnv & {
-  VITE_BACKEND_URL?: string;
-  VITE_BACKEND_PORT?: string;
+  VITE_API_URL?: string;
 };
 
-const viteBackendUrl = viteEnv.VITE_BACKEND_URL;
-const viteBackendPort = viteEnv.VITE_BACKEND_PORT;
+const viteApiUrl = viteEnv.VITE_API_URL;
 
 const normalizeBackendUrl = (value: string) => {
   const trimmed = value.trim().replace(/\/+$/, "");
@@ -20,19 +18,14 @@ const normalizeBackendUrl = (value: string) => {
 };
 
 let baseURL = "/api"; // default for dev proxy
-if (viteBackendUrl) {
-  baseURL = `${normalizeBackendUrl(viteBackendUrl)}/api`;
-} else if (viteBackendPort) {
-  // running in browser without Vite proxy - point directly to backend
-  baseURL = `http://localhost:${viteBackendPort}/api`;
+if (viteApiUrl) {
+  baseURL = `${normalizeBackendUrl(viteApiUrl)}/api`;
 }
 
 const api = axios.create({
   baseURL,
 });
 
-// Helpful debug log so developers can see which backend URL the frontend is using.
-// Leave this in during local development; remove or lower log level for production.
 if (typeof window !== "undefined") {
   // eslint-disable-next-line no-console
   console.debug("admin-web: API baseURL =", baseURL);

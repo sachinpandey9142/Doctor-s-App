@@ -22,15 +22,15 @@ Premium React Native client for verified medical professionals with social feed,
 
 Create a .env file inside mobile:
 
-EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8080/api
-EXPO_PUBLIC_SOCKET_URL=http://127.0.0.1:8080
+EXPO_PUBLIC_API_BASE_URL=https://curo-backend-fwaq.onrender.com/api
+EXPO_PUBLIC_SOCKET_URL=https://curo-backend-fwaq.onrender.com
 
-If you skip the .env file, Android defaults to `127.0.0.1` for adb reverse and other platforms default to `localhost`.
+If you skip the .env file, use the deployed backend values above or add your own environment overrides for local development.
 
 For physical Android device via USB, run:
 
 - adb reverse tcp:8080 tcp:8080
-  Then use the localhost values above.
+  Then use your local backend values if you choose to run one.
 
 ## Key Structure
 
